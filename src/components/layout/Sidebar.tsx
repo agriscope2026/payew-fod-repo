@@ -2,9 +2,12 @@ import { NavLink } from 'react-router-dom'
 import { Logo } from '@/components/common/Logo'
 import { useAuth } from '@/features/auth/auth-context'
 import { ROLE_LABELS } from '@/features/auth/permissions'
+import { useUnreadAnnouncements } from '@/features/announcements/api'
 import { usePendingDecisions } from '@/features/approvals/api'
 import { useMyPendingDirectives } from '@/features/directives/api'
 import { useUnreadCount } from '@/features/notifications/api'
+import { useMyWorkItems } from '@/features/tasks/api'
+import { useWorkspace } from '@/features/workspace/workspace-context'
 import { cn } from '@/lib/utils'
 import { navForRole } from './nav-config'
 
@@ -14,10 +17,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { data: pendingDirectives = 0 } = useMyPendingDirectives()
   const { data: unread = 0 } = useUnreadCount()
   const { data: decisions = 0 } = usePendingDecisions()
+  const { data: work } = useMyWorkItems()
+  const { data: news = 0 } = useUnreadAnnouncements()
+  const { selectedProgramIds } = useWorkspace()
   const counts: Record<string, number> = {
     '/directives': pendingDirectives,
     '/notifications': unread,
     '/approvals': decisions,
+    '/announcements': news,
+    '/tasks': work?.filter((w) => selectedProgramIds.includes(w.program_id)).length ?? 0,
   }
   const programLabel =
     role === 'superadmin' ? 'All programs' : programs.map((p) => p.code).join(', ') || '—'

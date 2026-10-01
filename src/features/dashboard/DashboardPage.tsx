@@ -1,173 +1,128 @@
-import {
-  ArrowRightIcon,
-  BellIcon,
-  CalendarRangeIcon,
-  FolderKanbanIcon,
-  ShieldCheckIcon,
-} from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { CalendarRangeIcon } from 'lucide-react'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/auth-context'
-import { ROLE_LABELS } from '@/features/auth/permissions'
-import { useUnreadCount } from '@/features/notifications/api'
+import { useAppSettings } from '@/features/settings/api'
 import { useWorkspace } from '@/features/workspace/workspace-context'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate } from '@/lib/format'
+import { useDashboardSummary } from './api'
+import { AttentionPanel } from './components/AttentionPanel'
+import { ComplianceScorecard } from './components/ComplianceScorecard'
+import { KpiRow } from './components/KpiRow'
+import { OverduePanel } from './components/OverduePanel'
+import {
+  AgingPanel,
+  ByClassPanel,
+  CategoryPanel,
+  DeliveriesPanel,
+  FlowPanel,
+  FunnelPanel,
+  StatusPanel,
+  SupplierPanel,
+} from './components/Widgets'
 
 /**
- * Phase 1 dashboard: confirms identity, scope and filters. KPI cards and charts
- * (driven by SQL views/RPCs) replace the roadmap card in Phase 9.
+ * Phase 9 dashboard. Every figure comes from dashboard_summary() and follows the
+ * workspace FY and program selector.
  */
 export default function DashboardPage() {
-  const { profile, role } = useAuth()
+  const { profile } = useAuth()
   const { fiscalYear, programFilter, programs, selectedProgramIds } = useWorkspace()
-  const { data: unread = 0 } = useUnreadCount()
+  const { data: settings } = useAppSettings()
+  const summary = useDashboardSummary(fiscalYear?.id ?? null, selectedProgramIds)
   const scope = programs.filter((p) => selectedProgramIds.includes(p.id))
   const firstName = profile?.full_name.split(' ')[0]
+  const th = settings?.dashboard_thresholds
+
+  const header = (
+    <PageHeader
+      title={`Magandang araw, ${firstName}!`}
+      description={`${fiscalYear?.label ?? 'No fiscal year'} · ${
+        programFilter === 'all' ? 'All programs' : scope.map((p) => p.code).join(', ')
+      }${summary.data ? ` · as of ${formatDate(summary.data.as_of)}` : ''}`}
+    />
+  )
+
+  if (!fiscalYear || !selectedProgramIds.length) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <EmptyState
+          icon={CalendarRangeIcon}
+          title="Nothing to show yet"
+          description="Pick a fiscal year and at least one program in the top bar."
+        />
+      </div>
+    )
+  }
+
+  if (summary.isError) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <ErrorState onRetry={() => void summary.refetch()} />
+      </div>
+    )
+  }
+
+  const d = summary.data
+  if (!d) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Skeleton className="h-72 lg:col-span-2" />
+          <Skeleton className="h-72" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`Magandang araw, ${firstName}!`}
-        description={`${fiscalYear?.label ?? 'No fiscal year'} · ${
-          programFilter === 'all' ? 'All programs' : scope.map((p) => p.code).join(', ')
-        }`}
-      />
+      {header}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ShieldCheckIcon} label="Your role" value={role ? ROLE_LABELS[role] : '—'} />
-        <StatCard
-          icon={FolderKanbanIcon}
-          label="Programs in scope"
-          value={String(scope.length)}
-          hint={scope.map((p) => p.code).join(' · ')}
-        />
-        <StatCard
-          icon={CalendarRangeIcon}
-          label="Fiscal year"
-          value={fiscalYear?.label ?? '—'}
-          hint={
-            fiscalYear
-              ? `${formatDate(fiscalYear.start_date)} – ${formatDate(fiscalYear.end_date)} · ${fiscalYear.status}`
-              : undefined
-          }
-        />
-        <StatCard
-          icon={BellIcon}
-          label="Unread notifications"
-          value={String(unread)}
-          action={
-            <Link to="/notifications" className="text-primary text-xs hover:underline">
-              Open
-            </Link>
-          }
-        />
+      <KpiRow kpis={d.kpis} thresholds={th} />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <FlowPanel data={d} />
+        <AttentionPanel attention={d.attention} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Programs</CardTitle>
-            <CardDescription>Programs you can access with your account.</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">
-            {scope.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <span
-                  className="size-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: p.color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">
-                    {p.code} <span className="text-muted-foreground font-normal">· {p.name}</span>
-                  </p>
-                  {p.description && (
-                    <p className="text-muted-foreground truncate text-xs">{p.description}</p>
-                  )}
-                </div>
-                {p.archived_at && <Badge variant="outline">Archived</Badge>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Account</CardTitle>
-            <CardDescription>{profile?.email}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <Row label="Position" value={profile?.position} />
-            <Row label="Office" value={profile?.office} />
-            <Row label="Last sign-in" value={formatDateTime(profile?.last_login_at)} />
-            <Row
-              label="Can edit activities"
-              value={
-                role === 'program_staff'
-                  ? profile?.can_edit_activities
-                    ? 'Yes'
-                    : 'No (read-only)'
-                  : 'Yes'
-              }
-            />
-            <Button asChild variant="outline" size="sm" className="mt-3">
-              <Link to="/account/password">
-                Change password <ArrowRightIcon />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StatusPanel data={d} />
+        <ByClassPanel rows={d.by_class} />
+        <AgingPanel rows={d.aging} />
       </div>
 
-      <Card className="bg-muted/40 border-dashed">
-        <CardContent className="text-muted-foreground text-sm">
-          <strong className="text-foreground">Coming in Phase 9:</strong> KPI cards (allotment,
-          obligated, disbursed, rates, savings), budget vs obligation vs disbursement charts,
-          overdue activities with “Send Overdue Notice”, the Needs Attention panel, the compliance
-          scorecard and obligation aging.
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <OverduePanel
+          activities={d.overdue_activities}
+          packages={d.overdue_packages}
+          activityTotal={d.activities.delayed}
+          packageTotal={d.packages.delayed}
+        />
+        <DeliveriesPanel rows={d.pending_deliveries} />
+      </div>
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  action,
-}: {
-  icon: typeof BellIcon
-  label: string
-  value: string
-  hint?: string
-  action?: React.ReactNode
-}) {
-  return (
-    <Card className="gap-2">
-      <CardContent className="flex items-start gap-3">
-        <span className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
-          <Icon className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-muted-foreground text-xs">{label}</p>
-          <p className="truncate text-lg font-semibold">{value}</p>
-          {hint && <p className="text-muted-foreground truncate text-xs">{hint}</p>}
-        </div>
-        {action}
-      </CardContent>
-    </Card>
-  )
-}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <FunnelPanel rows={d.funnel} />
+        <SupplierPanel rows={d.by_supplier} />
+        <CategoryPanel rows={d.by_category} />
+      </div>
 
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right">{value || '—'}</span>
+      <ComplianceScorecard
+        rows={d.compliance}
+        thresholds={th}
+        progressDays={settings?.approvals?.progress_update_days ?? 30}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@
 -- * WFP (approved), PPMP (approved) and APP (submitted) per program
 -- * ORS / deliveries / DV per package, following where each package's
 --   workflow is: closed → fully paid; obligated before delivery; partial
---   delivery with staged payment; accepted but unpaid (payables)
+--   delivery with staged payments (two DVs); accepted but unpaid (payables)
 -- * activity-level honoraria (non-procurement) and procurement savings
 -- Idempotent: skipped if the first allotment exists.
 -- =============================================================================
@@ -177,11 +177,20 @@ begin
           v_today - 30, p.contract_amount, v_gaa, p.expense_class_id, p.uacs_code_id, p.supplier_id, p.title)
         returning id into v_ors;
       end if;
-      v_amt := round(p.contract_amount * 0.6, 2);
+      -- delivery 1 is paid in two stages (half on processing, the balance after the IAR review)
+      v_amt := round(p.contract_amount * 0.3, 2);
       insert into public.disbursements (program_id, fiscal_year_id, activity_id, package_id, dv_no, dv_date, gross_amount,
         tax_withheld, payee_supplier_id, check_ada_no, particulars)
       values (p.program_id, p.fiscal_year_id, p.activity_id, p.id, 'DV-2026-' || lpad(v_n::text, 4, '0') || 'A',
-        v_today - 5, v_amt, round(v_amt * 0.06, 2), p.supplier_id, 'ADA-' || (880000 + v_n), 'Partial payment, delivery 1 of 2')
+        v_today - 8, v_amt, round(v_amt * 0.06, 2), p.supplier_id, 'ADA-' || (880000 + v_n), 'Staged payment 1 of 2, delivery 1')
+      returning id into v_dv;
+      insert into public.disbursement_obligations (disbursement_id, obligation_id, program_id, amount)
+      values (v_dv, v_ors, p.program_id, v_amt);
+      v_amt := round(p.contract_amount * 0.6, 2) - v_amt;
+      insert into public.disbursements (program_id, fiscal_year_id, activity_id, package_id, dv_no, dv_date, gross_amount,
+        tax_withheld, payee_supplier_id, check_ada_no, particulars)
+      values (p.program_id, p.fiscal_year_id, p.activity_id, p.id, 'DV-2026-' || lpad(v_n::text, 4, '0') || 'B',
+        v_today - 5, v_amt, round(v_amt * 0.06, 2), p.supplier_id, 'ADA-' || (880500 + v_n), 'Staged payment 2 of 2, delivery 1')
       returning id into v_dv;
       insert into public.disbursement_obligations (disbursement_id, obligation_id, program_id, amount)
       values (v_dv, v_ors, p.program_id, v_amt);

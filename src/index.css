@@ -32,6 +32,25 @@
   --sidebar-accent: oklch(0.37 0.08 152);
   --sidebar-border: oklch(0.36 0.06 152);
   --radius: 0.6rem;
+  /* Charts (validated with the dataviz palette checks, light and dark). */
+  --viz-1: #2a78d6; /* categorical slot 1 (blue) */
+  --viz-2: #eb6834; /* categorical slot 2 (orange) */
+  --viz-track: #b7d3f6; /* bullet: outer (context) level */
+  --viz-mid: #3987e5;
+  --viz-strong: #104281;
+  --viz-ord-1: #86b6ef; /* ordinal ramp, low → high */
+  --viz-ord-2: #3987e5;
+  --viz-ord-3: #1c5cab;
+  --viz-ord-4: #0d366b;
+  /* categorical slots in fixed order (procurement categories) */
+  --viz-cat-1: #2a78d6;
+  --viz-cat-2: #eb6834;
+  --viz-cat-3: #1baf7a;
+  --viz-cat-4: #eda100;
+  --viz-cat-5: #e87ba4;
+  --viz-cat-6: #008300;
+  --viz-cat-7: #4a3aa7;
+  --viz-cat-8: #e34948;
 }
 
 .dark {
@@ -58,6 +77,23 @@
   --sidebar-muted: oklch(0.68 0.03 145);
   --sidebar-accent: oklch(0.26 0.04 155);
   --sidebar-border: oklch(0.27 0.03 155);
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-track: #184f95;
+  --viz-mid: #3987e5;
+  --viz-strong: #9ec5f4;
+  --viz-ord-1: #184f95;
+  --viz-ord-2: #2a78d6;
+  --viz-ord-3: #6da7ec;
+  --viz-ord-4: #b7d3f6;
+  --viz-cat-1: #3987e5;
+  --viz-cat-2: #d95926;
+  --viz-cat-3: #199e70;
+  --viz-cat-4: #c98500;
+  --viz-cat-5: #d55181;
+  --viz-cat-6: #008300;
+  --viz-cat-7: #9085e9;
+  --viz-cat-8: #e66767;
 }
 
 @theme inline {
@@ -88,6 +124,23 @@
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-border: var(--sidebar-border);
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-track: var(--viz-track);
+  --color-viz-mid: var(--viz-mid);
+  --color-viz-strong: var(--viz-strong);
+  --color-viz-ord-1: var(--viz-ord-1);
+  --color-viz-ord-2: var(--viz-ord-2);
+  --color-viz-ord-3: var(--viz-ord-3);
+  --color-viz-ord-4: var(--viz-ord-4);
+  --color-viz-cat-1: var(--viz-cat-1);
+  --color-viz-cat-2: var(--viz-cat-2);
+  --color-viz-cat-3: var(--viz-cat-3);
+  --color-viz-cat-4: var(--viz-cat-4);
+  --color-viz-cat-5: var(--viz-cat-5);
+  --color-viz-cat-6: var(--viz-cat-6);
+  --color-viz-cat-7: var(--viz-cat-7);
+  --color-viz-cat-8: var(--viz-cat-8);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

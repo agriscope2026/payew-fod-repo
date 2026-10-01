@@ -1,6 +1,5 @@
 import { KeyRoundIcon, LogOutIcon, MoonIcon, SunIcon, UserIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/features/auth/auth-context'
 import { ROLE_LABELS } from '@/features/auth/permissions'
+import { UserAvatar } from '@/features/profile/UserAvatar'
 import { useTheme } from '@/hooks/use-theme'
-import { initials } from '@/lib/utils'
 
 export function UserMenu() {
   const { profile, role, signOut } = useAuth()
@@ -25,9 +24,7 @@ export function UserMenu() {
         className="focus-visible:ring-ring/50 flex items-center gap-2 rounded-full p-0.5 outline-none focus-visible:ring-[3px] md:rounded-md md:pr-2"
         aria-label="Account menu"
       >
-        <Avatar>
-          <AvatarFallback>{initials(profile?.full_name)}</AvatarFallback>
-        </Avatar>
+        <UserAvatar name={profile?.full_name} avatarKey={profile?.avatar_key} />
         <span className="hidden text-left leading-tight md:block">
           <span className="block max-w-40 truncate text-sm font-medium">{profile?.full_name}</span>
           <span className="text-muted-foreground block text-[11px]">

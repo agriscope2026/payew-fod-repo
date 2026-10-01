@@ -17,7 +17,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 lg:block">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 lg:block print:hidden">
         <Sidebar />
       </aside>
 
@@ -43,7 +43,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <MaintenanceBanner />
-        <header className="bg-background/90 sticky top-0 z-30 flex h-16 items-center gap-2 border-b px-4 backdrop-blur sm:gap-3 sm:px-6">
+        <header className="bg-background/90 sticky top-0 z-30 flex h-16 items-center gap-2 border-b px-4 backdrop-blur sm:gap-3 sm:px-6 print:hidden">
           <Button
             variant="ghost"
             size="icon"

@@ -30,7 +30,10 @@ the money level by level: **allotment → obligation → disbursement → balanc
 | 6B | **Addendum B:** Suppliers master list & profile (PhilGEPS/permit expiry, bank details admin-only, ratings, Excel import/export), procurement packages per activity with their own parallel package workflow, award/re-award/split/merge/cancel, obligation-before-delivery ordering, derived activity progress, Packages tab (table/board/timeline) | ✅ |
 | 7     | Finance: Excel-like WFP/PPMP/APP sheets (paste from Excel, import/export, submit/approve), allotments, package-based Financial Tracker (many ORS, partial deliveries, staged DVs linked to ORS), warn/block validations with flags, payables with aging, procurement savings, registers, daily delivery/payment reminders | ✅ |
 | 8     | Approvals (cancellation, extension, stage skip, workflow change, supplier re-award, contract variation, obligation-order exception, realignment) with auto-apply and admin→superadmin routing; progress updates (physical %, financial snapshot); issues & risks; monitoring reminders | ✅ |
-| 9–12 | Dashboard, calendar/tasks/reports, admin pages, seed/tests/deploy (incl. Addendum B effects) | planned |
+| 9     | Dashboard: KPI cards with RAG thresholds, cumulative obligation/disbursement vs allotment, by expense class, activity & package status, Needs attention, overdue activities/packages with "Send Overdue Notice", pending deliveries, packages by stage, spending by supplier/category, procurement savings, obligated-but-undelivered / delivered-but-unpaid, obligation aging, compliance scorecard | ✅ |
+| 10    | My Tasks inbox (stages, checklist tasks, directives, approvals, issues), Calendar (month/agenda; activity, stage, package solicitation/award/delivery/payment, directive and issue dates; package events by category with show/hide), Reports (BUR with activity → package → supplier drill-down, accomplishment, procurement status, supplier performance, supplier awards & payments, savings, payables, beneficiaries, compliance) with Excel export and print | ✅ |
+| 11    | Announcements (all programs or one program, scheduled/expiring, pinned, read tracking, notifications), Audit Log viewer with field-level diffs, central Trash (restore anything soft-deleted, unarchive programs, reopen fiscal years), Profile (details, photo, recent activity), User Guide (tutorials incl. multiple suppliers/packages, FAQ, glossary) | ✅ |
+| 12    | Seed scenarios (B7, incl. staged payments, announcements), roll-up and hardening tests, production reference data, PSGC location import, first-superadmin bootstrap, post-deploy checklist, CI, Vercel security headers, deployment guide | ✅ |
 
 Spec addenda live in [docs/spec/](docs/spec/).
 
@@ -81,7 +84,7 @@ Requirements: Node 20+, and Docker Desktop for the local Supabase stack.
 npm install
 cp .env.example .env.local            # then fill in the values printed by `supabase start`
 npx supabase start                    # starts Postgres/Auth/Realtime locally
-npx supabase db reset                 # applies migrations + seed.sql
+npx supabase db reset                 # migrations + reference.sql + seed.sql + seeds/*.sql
 npm run db:types                      # optional: regenerate src/types/database.ts
 npm run dev                           # http://localhost:5173
 ```
@@ -195,6 +198,33 @@ R2 setup: a private bucket, a CORS rule allowing `GET, PUT, HEAD` from your app 
 - **Issues & risks**: any program member can raise one; owners, raisers and writers update it; high/critical ones notify program admins (critical: also the superadmin); resolving requires a resolution.
 - **Reminders** (`run_monitoring_reminders`, pg_cron `payew-monitoring-reminders`): approvals waiting N days, overdue issues, and ongoing activities without a progress update in 30 days.
 
+## Dashboard (Phase 9)
+
+- **One call.** `dashboard_summary(fiscal_year_id, program_ids)` returns every figure as one jsonb document and follows the workspace FY and program selector. It runs as security definer so staff see program-level totals, but only for programs they belong to (superadmins: all).
+- **KPIs**: allotment, obligated (ORS) with obligation rate, disbursed (DV) with disbursement rate, unobligated allotment with budget utilization. Colours follow Settings → System → *Dashboard color thresholds*; every rate carries an icon and a label.
+- **Charts**: cumulative ORS/DV by month against the allotment; allotment/obligated/disbursed per expense class; packages by the phase of their current step; top suppliers (contract vs paid); spending per procurement category (ABC, contract, paid); unpaid ORS by age (0–30, 31–60, 61–90, 90+ days). Hover or focus any bar or point for the exact amounts.
+- **Lists**: overdue activities and packages (most days late first) with *Send Overdue Notice* for program admins; deliveries scheduled in the next 30 days and late ones.
+- **Needs attention**: your unanswered directives, approvals you can decide, overdue stages/tasks assigned to you, high/critical and overdue issues, payables unpaid 7+ days, flagged finance records, plans and savings awaiting an admin, suppliers with open packages and expiring papers.
+- **Compliance scorecard** per program: activities on schedule, ongoing activities with a progress update within the configured days, directives answered by their due date, obligation and disbursement rates, plans approved (of WFP/PPMP/APP), open high/critical issues.
+
+## My Tasks, Calendar & Reports (Phase 10)
+
+- **My Tasks** (`my_work_items()`): workflow stages assigned to you (or the current stage of activities/packages you are responsible for when nobody is assigned), checklist tasks, directives you haven't answered, approvals you can decide and issues you own, grouped as overdue / today / next 7 days / later. Checklist tasks can be ticked off from the list. The sidebar shows the count.
+- **Calendar** (`calendar_events(from, to, programs)`): month grid or agenda. Activity implementation periods (shown on their first and last day), activity due dates, open stage targets, package solicitation (the first RFQ/solicitation step), award (actual, else planned), package due dates, deliveries, payment due (7 days after acceptance while unpaid), directive response deadlines and issue targets. Package events are colour-coded by procurement category; each group can be hidden, and the choice is remembered on the device. Clicking an event opens the activity, package, directive or issue.
+- **Reports** (`/reports`) follow the FY and program selector, filter and sort in place, export the visible rows to Excel and print cleanly (navigation is hidden on paper):
+  - *Budget Utilization* — by expense class, then activity → package → supplier
+  - *Payables*, *Procurement Savings*
+  - *Physical & Financial Accomplishment*, *Beneficiaries Served* (`report_beneficiaries()`), *Compliance*
+  - *Procurement Status* per package, *Supplier Performance* and *Supplier Awards & Payments* (`report_suppliers()`; ratings only for admins)
+
+## Announcements, Audit Log, Trash, Profile & Guide (Phase 11)
+
+- **Announcements**: the superadmin posts to everyone or any program; program admins post to their own programs. Posts can be pinned, marked important/urgent, scheduled (`publish_at`) and set to expire. Readers see live posts only; opening one marks it read (the sidebar shows unread). Everyone in the audience is notified once when the post goes live — immediately, or via `publish_due_announcements()` (pg_cron `payew-announcements`, hourly) for scheduled ones.
+- **Audit Log** (superadmin): every tracked change with who, when, the record and a before/after view of the changed fields; filter by record type, action, person, dates or record ID; export a page as CSV. Follows the program selector (system-wide rows always show).
+- **Trash** (`trash_items()` / `restore_trash_item()`): one list of soft-deleted activities, packages, beneficiaries, suppliers, files, allotments, announcements, programs and master-list entries, limited to what you manage; restore runs with your own permissions. Archived programs can be unarchived and closed/locked fiscal years reopened (superadmin).
+- **Profile**: edit your name, position, office, province and contact number; upload a photo (any image the browser can open — JPG, PNG, WebP… up to 25 MB — is cropped to a square and compressed in the browser to a ~50 KB 512 px JPEG before it goes to R2 as a personal file); see your last 30 changes (`my_recent_activity()`).
+- **User Guide**: searchable tutorials (including *Working with multiple suppliers*), FAQ and glossary (ABC, PR, RFQ, NOA, PO, SVP, ORS, DV, PPMP, WFP, APP, UACS, …).
+
 ## Working against a hosted Supabase project
 
 ```bash
@@ -211,13 +241,20 @@ npx supabase db query --linked -f supabase/seeds/04_collaboration.sql
 npx supabase db query --linked -f supabase/seeds/05_suppliers_packages.sql
 npx supabase db query --linked -f supabase/seeds/06_finance.sql
 npx supabase db query --linked -f supabase/seeds/07_monitoring.sql
+npx supabase db query --linked -f supabase/seeds/08_announcements.sql
 ```
 
 In Dashboard → Authentication → URL Configuration, set Site URL `http://localhost:5173` and add the redirect `http://localhost:5173/reset-password`.
 
-## Deployment (summary; full guide in Phase 12)
+## Deployment
 
-1. Create a Supabase project, then run `npx supabase link` and `npx supabase db push`. Do **not** run `seed.sql` in production.
-2. Auth → URL configuration: set the Site URL and add `https://<your-domain>/reset-password` as a redirect URL.
-3. Cloudflare Pages: build command `npm run build`, output `dist`, env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_NAME`. Add a SPA fallback (`public/_redirects` → `/* /index.html 200`).
-4. R2 keys and email API keys are **Edge Function secrets** (`supabase secrets set …`), never `VITE_*`.
+The full step-by-step guide is in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. In short:
+
+1. Supabase: enable pg_cron, run `npx supabase db push`, then load **`supabase/reference.sql`** (programs, master lists, settings). It's safe to re-run. **Never** run `seed.sql` or `seeds/*.sql` in production; they create demo accounts.
+2. Auth: turn off sign-ups, set the Site URL and the `/reset-password` redirect, and configure SMTP.
+3. R2: a private bucket with a CORS rule for the site; its keys go into Edge Function secrets with `ALLOWED_ORIGINS`. Then deploy the `admin-users` and `files` functions.
+4. Vercel: set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_NAME` and `VITE_APP_FULL_NAME`. `vercel.json` provides the SPA rewrite and security headers.
+5. Add the first user in Supabase Auth; on an empty system it becomes the superadmin. Then import locations from the PSA PSGC file (Settings → Master Lists → Locations), create the fiscal year and add users.
+6. Run `supabase/checks/post_deploy.sql` in the SQL editor; every row should be `ok`.
+
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, all unit and database tests, and a production build on every push and pull request.

@@ -80,12 +80,20 @@ const act = (s: Session, stageId: string, action: string, note: string | null = 
 /** Ticks a stage's required tasks/fields as postgres, then completes it as `user`. */
 async function finish(s: Session, stageId: string, user: string) {
   await s.asAdmin()
-  await s.q(`update public.activity_tasks set is_done = true where stage_progress_id = $1`, [stageId])
+  await s.q(`update public.activity_tasks set is_done = true where stage_progress_id = $1`, [
+    stageId,
+  ])
   await s.as(user)
   await act(s, stageId, 'complete')
 }
 
-const award = (s: Session, pkg: string, supplier: string, amount = 90000, reason: string | null = null) =>
+const award = (
+  s: Session,
+  pkg: string,
+  supplier: string,
+  amount = 90000,
+  reason: string | null = null,
+) =>
   s.q<{ w: { level: string; message: string }[] }>(
     `select public.award_package($1, $2, $3, '2026-03-20', 'PO-2026-001', null, $4) as w`,
     [pkg, supplier, amount, reason],
@@ -174,7 +182,10 @@ describe('two-level workflow', () => {
       )
       expect(pk).toEqual({ status: 'ongoing', current_stage_name: 'Purchase Request (PR)' })
       // Activity counts as under way once any track moves.
-      const [v] = await s.q<{ status: string }>(`select status from public.activities where id = $1`, [a.id])
+      const [v] = await s.q<{ status: string }>(
+        `select status from public.activities where id = $1`,
+        [a.id],
+      )
       expect(v.status).toBe('ongoing')
 
       // Award stage needs package fields.
@@ -229,11 +240,13 @@ describe('container stage', () => {
       `update public.activity_stage_progress set status = 'completed' where activity_id = $1 and package_id is null and sort_order < 4`,
       [activityId],
     )
-    await s.q(`update public.activity_stage_progress set status = 'in_progress' where id = $1`, [stages[3].id])
-    await s.q(`update public.activities set current_stage_id = $2, status = 'ongoing' where id = $1`, [
-      activityId,
+    await s.q(`update public.activity_stage_progress set status = 'in_progress' where id = $1`, [
       stages[3].id,
     ])
+    await s.q(
+      `update public.activities set current_stage_id = $2, status = 'ongoing' where id = $1`,
+      [activityId, stages[3].id],
+    )
     return stages[3]
   }
 
@@ -244,9 +257,13 @@ describe('container stage', () => {
       const container = await toContainer(s, a.id)
 
       await s.asAdmin()
-      await s.q('update public.profiles set can_edit_activities = true where id = $1', [USERS.amiaStaff1])
+      await s.q('update public.profiles set can_edit_activities = true where id = $1', [
+        USERS.amiaStaff1,
+      ])
       await s.as(USERS.amiaStaff1)
-      await expect(act(s, container.id, 'complete')).rejects.toThrow(/ask a program admin to override/)
+      await expect(act(s, container.id, 'complete')).rejects.toThrow(
+        /ask a program admin to override/,
+      )
       await s.as(USERS.amiaAdmin)
       await expect(act(s, container.id, 'complete')).rejects.toThrow(/Give a justification/)
       await act(s, container.id, 'complete', 'Lodging supplier will be paid next FY')
@@ -270,7 +287,9 @@ describe('container stage', () => {
       // Close P01 by running its whole track.
       for (const st of await track(s, a.id, p1.id)) {
         await s.asAdmin()
-        await s.q(`update public.activity_tasks set is_done = true where stage_progress_id = $1`, [st.id])
+        await s.q(`update public.activity_tasks set is_done = true where stage_progress_id = $1`, [
+          st.id,
+        ])
         await s.q(
           `update public.procurement_packages set supplier_id = $2, contract_amount = 90000,
              award_date = '2026-03-20', procurement_mode_id = (select id from public.procurement_modes where code = 'SVP')
@@ -280,7 +299,11 @@ describe('container stage', () => {
         await s.as(USERS.amiaAdmin)
         await act(s, st.id, 'complete')
       }
-      const [v1] = await s.q<{ status: string; current_stage_name: string; packages_closed: number }>(
+      const [v1] = await s.q<{
+        status: string
+        current_stage_name: string
+        packages_closed: number
+      }>(
         `select p.status, v.current_stage_name, v.packages_closed::int
          from public.procurement_packages p join public.v_activities v on v.id = p.activity_id where p.id = $1`,
         [p1.id],
@@ -292,12 +315,58 @@ describe('container stage', () => {
       })
 
       // Cancelling the remaining one closes the container automatically.
-      await s.q(`select public.set_package_cancelled($1, true, 'Venue provided by the LGU')`, [p2.id])
+      await s.q(`select public.set_package_cancelled($1, true, 'Venue provided by the LGU')`, [
+        p2.id,
+      ])
       const [v2] = await s.q<{ current_stage_name: string }>(
         `select current_stage_name from public.v_activities where id = $1`,
         [a.id],
       )
       expect(v2.current_stage_name).toBe('Liquidation / Reporting')
+    })
+  })
+})
+
+describe('finished procurement stage', () => {
+  it('blocks new or un-cancelled packages until the stage is reopened', async () => {
+    await inTx(db, async (s) => {
+      const a = await newActivity(s)
+      const p1 = await newPackage(s, a.id)
+      const p2 = await newPackage(s, a.id)
+      const stages = await track(s, a.id, null)
+      // Procurement & Implementation finished; P01 was cancelled, P02 closed.
+      await s.as(USERS.amiaAdmin)
+      await s.q(`select public.set_package_cancelled($1, true, 'Provided by the LGU')`, [p1.id])
+      await s.asAdmin()
+      await s.q(
+        `update public.procurement_packages set status = 'closed', closed_at = now() where id = $1`,
+        [p2.id],
+      )
+      await s.q(
+        `update public.activity_stage_progress set status = 'completed' where activity_id = $1 and package_id is null and sort_order <= 4`,
+        [a.id],
+      )
+      await s.q(
+        `update public.activities set current_stage_id = $2, status = 'ongoing' where id = $1`,
+        [a.id, stages[4].id],
+      )
+      await s.as(USERS.amiaAdmin)
+
+      await expect(newPackage(s, a.id)).rejects.toThrow(/Reopen that stage/)
+      await expect(s.q(`select public.set_package_cancelled($1, false)`, [p1.id])).rejects.toThrow(
+        /Reopen that stage/,
+      )
+
+      // An admin reopens Procurement & Implementation; packages can be added again.
+      await act(
+        s,
+        stages[3].id,
+        'reopen',
+        'The LGU withdrew its counterpart; we procure the meals.',
+      )
+      await s.q(`select public.set_package_cancelled($1, false)`, [p1.id])
+      const p3 = await newPackage(s, a.id, { title: 'Venue' })
+      expect(p3.code).toMatch(/-P03$/)
     })
   })
 })
@@ -320,7 +389,9 @@ describe('awards', () => {
       })
 
       await s.as(USERS.amiaAdmin)
-      await expect(award(s, p.id, black)).rejects.toThrow(/Cannot award: Blacklisted: Non-delivery 2025/)
+      await expect(award(s, p.id, black)).rejects.toThrow(
+        /Cannot award: Blacklisted: Non-delivery 2025/,
+      )
       const [{ w }] = await award(s, p.id, expired, 85000)
       expect(w.map((x) => x.message)).toEqual(['PhilGEPS registration expired on Jan 1, 2020'])
 
@@ -340,7 +411,9 @@ describe('awards', () => {
       const second = await newSupplier(s, { business_name: 'Tublay Food Hub', tin: '222-333-444' })
 
       await s.asAdmin()
-      await s.q('update public.profiles set can_edit_activities = true where id = $1', [USERS.amiaStaff1])
+      await s.q('update public.profiles set can_edit_activities = true where id = $1', [
+        USERS.amiaStaff1,
+      ])
       await s.as(USERS.amiaStaff1)
       await expect(
         s.q(`update public.procurement_packages set supplier_id = $2 where id = $1`, [p.id, first]),
@@ -354,10 +427,10 @@ describe('awards', () => {
       ).rejects.toThrow(/Only program admins/)
 
       await s.as(USERS.amiaAdmin)
-      await s.q(`select public.reaward_package($1, $2, 95000, 'First supplier failed to deliver')`, [
-        p.id,
-        second,
-      ])
+      await s.q(
+        `select public.reaward_package($1, $2, 95000, 'First supplier failed to deliver')`,
+        [p.id, second],
+      )
       const hist = await s.q<{ action: string; supplier_id: string }>(
         `select action, supplier_id from public.package_supplier_history where package_id = $1 order by created_at`,
         [p.id],
@@ -367,10 +440,10 @@ describe('awards', () => {
         { action: 're_award', supplier_id: second },
       ])
       // Old supplier can still be rated for this package.
-      await s.q(`insert into public.supplier_ratings (package_id, supplier_id, rating, remark) values ($1, $2, 1, 'Did not deliver')`, [
-        p.id,
-        first,
-      ])
+      await s.q(
+        `insert into public.supplier_ratings (package_id, supplier_id, rating, remark) values ($1, $2, 1, 'Did not deliver')`,
+        [p.id, first],
+      )
       await s.as(USERS.amiaStaff1)
       expect(await s.q(`select 1 from public.supplier_ratings`)).toHaveLength(0)
     })
@@ -416,9 +489,13 @@ describe('awards', () => {
       await newPackage(s, a.id, { abc_amount: 80000 })
       await newPackage(s, a.id, { abc_amount: 50000 }) // warn mode: allowed
       await s.asAdmin()
-      await s.q(`update public.app_settings set value = '"block"' where key = 'validation_strictness'`)
+      await s.q(
+        `update public.app_settings set value = '"block"' where key = 'validation_strictness'`,
+      )
       await s.as(USERS.amiaAdmin)
-      await expect(newPackage(s, a.id, { abc_amount: 1 })).rejects.toThrow(/exceed the activity budget/)
+      await expect(newPackage(s, a.id, { abc_amount: 1 })).rejects.toThrow(
+        /exceed the activity budget/,
+      )
     })
   })
 })
@@ -439,11 +516,19 @@ describe('suppliers', () => {
       ).rejects.toThrow(/row-level security/)
 
       await s.as(USERS.hvcAdmin)
-      expect(await s.q('select 1 from public.supplier_bank_accounts where supplier_id = $1', [id])).toHaveLength(1)
+      expect(
+        await s.q('select 1 from public.supplier_bank_accounts where supplier_id = $1', [id]),
+      ).toHaveLength(1)
       await expect(
-        s.q(`update public.suppliers set status = 'blacklisted', status_reason = 'x' where id = $1`, [id]),
+        s.q(
+          `update public.suppliers set status = 'blacklisted', status_reason = 'x' where id = $1`,
+          [id],
+        ),
       ).rejects.toThrow(/Only a superadmin/)
-      await s.q(`update public.suppliers set status = 'suspended', status_reason = 'Late deliveries' where id = $1`, [id])
+      await s.q(
+        `update public.suppliers set status = 'suspended', status_reason = 'Late deliveries' where id = $1`,
+        [id],
+      )
       const [{ w }] = await s.q<{ w: { level: string }[] }>(
         `select public.supplier_award_check($1) as w`,
         [id],
@@ -477,19 +562,25 @@ describe('package collaboration', () => {
       const a = await newActivity(s)
       const p = await newPackage(s, a.id, { responsible_user_id: USERS.amiaStaff2 })
       await s.as(USERS.amiaAdmin)
-      await s.q(`insert into public.comments (entity_type, entity_id, body) values ('package', $1, 'Quotes are in')`, [
-        p.id,
-      ])
+      await s.q(
+        `insert into public.comments (entity_type, entity_id, body) values ('package', $1, 'Quotes are in')`,
+        [p.id],
+      )
       await s.asAdmin()
       const [n] = await s.q<{ link: string }>(
         `select link from public.notifications where user_id = $1 and entity_id = $2 and type = 'comment'`,
         [USERS.amiaStaff2, p.id],
       )
-      expect(n.link).toMatch(new RegExp(`^/activities/${a.id}/packages/${p.id}\\?tab=discussion#comment-`))
+      expect(n.link).toMatch(
+        new RegExp(`^/activities/${a.id}/packages/${p.id}\\?tab=discussion#comment-`),
+      )
 
       await s.as(USERS.hvcStaff1)
       await expect(
-        s.q(`insert into public.comments (entity_type, entity_id, body) values ('package', $1, 'x')`, [p.id]),
+        s.q(
+          `insert into public.comments (entity_type, entity_id, body) values ('package', $1, 'x')`,
+          [p.id],
+        ),
       ).rejects.toThrow(/row-level security/)
 
       // A PR filed on the package ticks only the package's PR item.
@@ -551,7 +642,14 @@ describe('dev seed (Addendum B)', () => {
       expect(c.suppliers).toBe(25)
       expect(c.blacklisted).toBe(1)
       expect(c.packages).toBeGreaterThan(40)
-      for (const k of ['closed', 'cancelled', 'obligate_first', 're_awards', 'with_savings', 'overdue']) {
+      for (const k of [
+        'closed',
+        'cancelled',
+        'obligate_first',
+        're_awards',
+        'with_savings',
+        'overdue',
+      ]) {
         expect(c[k], k).toBeGreaterThan(0)
       }
       // No blacklisted supplier was ever awarded.

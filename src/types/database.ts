@@ -541,6 +541,241 @@ export type DirectiveRecipientRow = {
   updated_at: string
 }
 
+export type AnnouncementPriority = 'normal' | 'important' | 'urgent'
+
+export type AnnouncementRow = {
+  id: string
+  program_id: string | null
+  title: string
+  body: string
+  priority: AnnouncementPriority
+  pinned: boolean
+  publish_at: string
+  expires_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  deleted_by: string | null
+}
+
+export type AnnouncementView = AnnouncementRow & {
+  program_code: string | null
+  author_name: string | null
+  is_live: boolean
+  is_read: boolean
+  read_count: number
+}
+
+/** trash_items(): one soft-deleted (or archived) record. */
+export type TrashItem = {
+  kind: string
+  item_id: string
+  title: string
+  detail: string | null
+  program_id: string | null
+  deleted_at: string
+  deleted_by: string | null
+}
+
+/** my_recent_activity(): one of the caller's own audit rows. */
+export type RecentActivity = {
+  occurred_at: string
+  action: string
+  table_name: string
+  record_id: string | null
+  changed_fields: string[] | null
+}
+
+export type WorkItemKind = 'stage' | 'task' | 'directive' | 'approval' | 'issue'
+
+/** my_work_items(): one row of the caller's inbox. */
+export type WorkItem = {
+  kind: WorkItemKind
+  item_id: string
+  title: string
+  context: string | null
+  due_date: string | null
+  status: string
+  priority: string | null
+  program_id: string
+  activity_id: string | null
+  package_id: string | null
+  can_complete: boolean
+}
+
+export type CalendarEventKind =
+  | 'activity'
+  | 'activity_due'
+  | 'stage_due'
+  | 'pkg_solicitation'
+  | 'pkg_award'
+  | 'pkg_due'
+  | 'delivery'
+  | 'payment_due'
+  | 'directive_due'
+  | 'issue_due'
+
+/** calendar_events(): one dated event. */
+export type CalendarEvent = {
+  kind: CalendarEventKind
+  ref_id: string
+  title: string
+  detail: string | null
+  start_date: string
+  end_date: string
+  program_id: string
+  activity_id: string | null
+  package_id: string | null
+  category_code: string | null
+  is_done: boolean
+  is_overdue: boolean
+}
+
+/** report_suppliers(): Supplier Performance / Awards & Payments row. */
+export type SupplierReportRow = {
+  supplier_id: string
+  business_name: string
+  supplier_status: SupplierStatus
+  packages: number
+  packages_closed: number
+  closed_on_time: number
+  packages_late: number
+  deliveries: number
+  deliveries_on_time: number
+  deliveries_late: number
+  deliveries_rejected: number
+  contract: number
+  obligated: number
+  accepted: number
+  paid: number
+  balance: number
+  avg_rating: number | null
+  ratings: number
+}
+
+/** report_beneficiaries(): one beneficiary served in the fiscal year. */
+export type BeneficiaryReportRow = {
+  beneficiary_id: string
+  name: string
+  type_name: string
+  province: string
+  municipality: string | null
+  members_male: number
+  members_female: number
+  members_total: number
+  members_ip: number
+  members_youth: number
+  members_pwd: number
+  members_senior: number
+  activities: number
+  programs: string
+  participants: number
+  amount: number
+}
+
+/** dashboard_summary(): every Phase 9 dashboard figure for one FY and a set of programs. */
+export type DashboardSummary = {
+  as_of: string
+  program_ids: string[]
+  kpis: {
+    allotted: number
+    planned: number
+    obligated: number
+    disbursed: number
+    obligated_all: number
+    disbursed_all: number
+    budget: number
+    obligated_undelivered: number
+    delivered_unpaid: number
+    savings_confirmed: number
+    savings_suggested: number
+  }
+  activities: Record<'total' | 'not_started' | 'ongoing' | 'delayed' | 'completed' | 'cancelled', number>
+  packages: Record<'total' | 'not_started' | 'ongoing' | 'delayed' | 'closed' | 'cancelled', number>
+  by_class: { code: string; allotted: number; planned: number; obligated: number; disbursed: number }[]
+  monthly: { month: string; obligated: number; disbursed: number }[]
+  funnel: { phase: PhaseKey | 'not_started'; packages: number; amount: number }[]
+  by_supplier: { id: string; name: string; packages: number; contract: number; paid: number }[]
+  by_category: {
+    name: string
+    code: string | null
+    packages: number
+    abc: number
+    contract: number
+    paid: number
+  }[]
+  savings: { awarded_packages: number; abc: number; contract: number; savings: number }
+  aging: { bucket: string; count: number; amount: number }[]
+  overdue_activities: {
+    id: string
+    code: string
+    title: string
+    program_id: string
+    current_stage_name: string | null
+    days_late: number
+    due_date: string | null
+    budget_amount: number | null
+    responsible: string | null
+  }[]
+  overdue_packages: {
+    id: string
+    code: string
+    title: string
+    program_id: string
+    activity_id: string
+    activity_code: string
+    supplier_name: string | null
+    current_stage_name: string | null
+    days_late: number
+    amount: number
+  }[]
+  pending_deliveries: {
+    id: string
+    delivery_no: number
+    scheduled_date: string
+    amount: number
+    is_late: boolean
+    package_id: string
+    package_code: string
+    package_title: string
+    activity_id: string
+    supplier_name: string | null
+  }[]
+  attention: Record<
+    | 'my_directives'
+    | 'my_overdue_stages'
+    | 'my_overdue_tasks'
+    | 'approvals_to_decide'
+    | 'critical_issues'
+    | 'overdue_issues'
+    | 'flagged_records'
+    | 'old_payables'
+    | 'savings_to_confirm'
+    | 'plans_to_approve'
+    | 'supplier_docs',
+    number
+  >
+  compliance: {
+    program_id: string
+    code: string
+    name: string
+    color: string
+    activities: number
+    on_schedule: number
+    ongoing: number
+    progress_current: number
+    directives_due: number
+    directives_on_time: number
+    budget: number
+    allotted: number
+    obligated: number
+    disbursed: number
+    plans_approved: number
+    critical_issues: number
+  }[]
+}
+
 export type OverdueNoticeDraft = {
   title: string
   body: string
@@ -1135,6 +1370,8 @@ export type Database = {
       notifications: Table<NotificationRow, 'user_id' | 'type' | 'title'>
       app_settings: Table<AppSettingRow, 'key' | 'value'>
       audit_logs: Table<AuditLogRow, 'action' | 'table_name'>
+      announcements: Table<AnnouncementRow, 'title' | 'body'>
+      announcement_reads: Table<{ announcement_id: string; user_id: string; read_at: string }, 'announcement_id' | 'user_id'>
       provinces: Table<ProvinceRow, 'name'>
       municipalities: Table<MunicipalityRow, 'name' | 'province_id'>
       barangays: Table<BarangayRow, 'name' | 'municipality_id'>
@@ -1212,6 +1449,7 @@ export type Database = {
       v_approval_requests: { Row: ApprovalView; Relationships: [] }
       v_activity_progress: { Row: ProgressUpdateRow; Relationships: [] }
       v_issues: { Row: IssueView; Relationships: [] }
+      v_announcements: { Row: AnnouncementView; Relationships: [] }
     }
     Functions: {
       record_login: { Args: Record<string, never>; Returns: ProfileRow }
@@ -1283,6 +1521,31 @@ export type Database = {
         Returns: string
       }
       overdue_notice_draft: { Args: { p_activity_id: string }; Returns: OverdueNoticeDraft }
+      import_locations: {
+        Args: { p_rows: Json }
+        Returns: { provinces: number; municipalities: number; barangays: number }
+      }
+      mark_announcement_read: { Args: { p_id: string }; Returns: undefined }
+      trash_items: { Args: Record<string, never>; Returns: TrashItem[] }
+      restore_trash_item: { Args: { p_kind: string; p_id: string }; Returns: undefined }
+      my_recent_activity: { Args: { p_limit?: number }; Returns: RecentActivity[] }
+      my_work_items: { Args: Record<string, never>; Returns: WorkItem[] }
+      calendar_events: {
+        Args: { p_from: string; p_to: string; p_program_ids?: string[] | null }
+        Returns: CalendarEvent[]
+      }
+      report_suppliers: {
+        Args: { p_fiscal_year_id: string; p_program_ids?: string[] | null }
+        Returns: SupplierReportRow[]
+      }
+      report_beneficiaries: {
+        Args: { p_fiscal_year_id: string; p_program_ids?: string[] | null }
+        Returns: BeneficiaryReportRow[]
+      }
+      dashboard_summary: {
+        Args: { p_fiscal_year_id: string; p_program_ids?: string[] | null }
+        Returns: DashboardSummary
+      }
       send_overdue_notice: {
         Args: {
           p_activity_id: string

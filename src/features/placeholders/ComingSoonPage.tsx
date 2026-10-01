@@ -5,19 +5,11 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
-const EXTRA: Record<string, { label: string; phase: number; description: string }> = {
-  '/profile': {
-    label: 'Profile',
-    phase: 11,
-    description: 'Name, position, contact, avatar, notification preferences and recent activity.',
-  },
-}
-
 /** Shell page for modules delivered in later build phases. */
 export default function ComingSoonPage() {
   const { pathname } = useLocation()
   const base = '/' + (pathname.split('/')[1] ?? '')
-  const item = ALL_NAV_ITEMS.find((i) => i.to === base) ?? EXTRA[base]
+  const item = ALL_NAV_ITEMS.find((i) => i.to === base)
 
   return (
     <div className="space-y-6">

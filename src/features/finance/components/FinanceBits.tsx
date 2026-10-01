@@ -59,7 +59,12 @@ const RATE = {
 export function RateBadge({ pct, state }: { pct: number | null; state: RateState }) {
   const m = RATE[state]
   return (
-    <span className={cn('inline-flex items-center gap-1 text-xs font-medium', m.className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap',
+        m.className,
+      )}
+    >
       <m.icon className="size-3.5" />
       {pct === null ? '—' : `${pct.toFixed(1)}%`} · {m.label}
     </span>

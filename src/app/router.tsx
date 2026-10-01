@@ -24,6 +24,14 @@ const DirectivesModule = lazy(() => import('@/features/directives/DirectivesModu
 const SuppliersModule = lazy(() => import('@/features/suppliers/SuppliersModule'))
 const FinancePage = lazy(() => import('@/features/finance/FinancePage'))
 const ApprovalsModule = lazy(() => import('@/features/approvals/ApprovalsModule'))
+const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
+const CalendarPage = lazy(() => import('@/features/calendar/CalendarPage'))
+const ReportsModule = lazy(() => import('@/features/reports/ReportsModule'))
+const AnnouncementsModule = lazy(() => import('@/features/announcements/AnnouncementsModule'))
+const AuditLogPage = lazy(() => import('@/features/audit/AuditLogPage'))
+const TrashPage = lazy(() => import('@/features/trash/TrashPage'))
+const GuidePage = lazy(() => import('@/features/guide/GuidePage'))
+const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'))
 
 const BUILT: Record<string, ReactNode> = {
   '/dashboard': <DashboardPage />,
@@ -37,6 +45,13 @@ const BUILT: Record<string, ReactNode> = {
   '/suppliers': <SuppliersModule />,
   '/finance': <FinancePage />,
   '/approvals': <ApprovalsModule />,
+  '/tasks': <TasksPage />,
+  '/calendar': <CalendarPage />,
+  '/reports': <ReportsModule />,
+  '/announcements': <AnnouncementsModule />,
+  '/audit-logs': <AuditLogPage />,
+  '/trash': <TrashPage />,
+  '/guide': <GuidePage />,
 }
 
 // Every nav item gets a route now; unbuilt modules render a placeholder.
@@ -70,7 +85,7 @@ export const router = createBrowserRouter([
               { index: true, element: <Navigate to="/dashboard" replace /> },
               ...moduleRoutes,
               { path: 'account/password', element: <AccountPasswordPage /> },
-              { path: 'profile', element: <ComingSoonPage /> },
+              { path: 'profile', element: <ProfilePage /> },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

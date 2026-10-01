@@ -40,6 +40,8 @@ export async function createDb({ seed = true } = {}) {
   }
   if (seed) {
     try {
+      // reference.sql (production-safe master data) first, then the dev seed — as config.toml does.
+      await db.exec(readFileSync(join(root, 'supabase/reference.sql'), 'utf8'))
       await db.exec(readFileSync(join(root, 'supabase/seed.sql'), 'utf8'))
       // Per-module seed files (supabase/seeds/*.sql), in name order, as config.toml does.
       const seedsDir = join(root, 'supabase/seeds')

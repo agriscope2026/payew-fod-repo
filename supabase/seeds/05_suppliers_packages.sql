@@ -32,6 +32,7 @@ declare
   v_end      date;
   v_admin    uuid;
   v_dir      uuid;
+  v_pkgs     uuid[];
 begin
   if exists (select 1 from public.suppliers where id = '70000000-0000-4000-8000-000000000001') then
     raise notice 'Suppliers/packages already seeded; skipping.';
@@ -157,11 +158,12 @@ begin
     join public.profiles p on p.id = m.user_id and p.role = 'program_admin'
     where m.program_id = r.program_id limit 1;
 
+    -- Create every package of the activity first, then walk each track; otherwise the
+    -- first package closing would finish Procurement & Implementation on its own.
+    v_pkgs := '{}';
     for v_j in 1 .. v_n loop
       v_cat := v_cats[1 + ((r.k + v_j - 2) % array_length(v_cats, 1))];
       v_abc := round(r.budget * 0.8 / v_n * (1 + (v_j % 2) * 0.25), -2);
-      v_lvl := case when r.done < 3 then case when v_j = 1 then 1 else 0 end
-                    else (array[10, 5, 2, 7, 0])[v_j] end;
 
       insert into public.procurement_packages (
         activity_id, title, description, category_id, procurement_mode_id, expense_class_id, uacs_code_id,
@@ -189,6 +191,15 @@ begin
                   when r.k = 7 and v_j = 4 then 'Partial delivery 1 of 2 received; balance due next week.' end
       from public.procurement_categories c where c.code = v_cat
       returning id into v_pkg;
+      v_pkgs := v_pkgs || v_pkg;
+    end loop;
+
+    for v_j in 1 .. v_n loop
+      v_pkg := v_pkgs[v_j];
+      v_cat := v_cats[1 + ((r.k + v_j - 2) % array_length(v_cats, 1))];
+      v_abc := round(r.budget * 0.8 / v_n * (1 + (v_j % 2) * 0.25), -2);
+      v_lvl := case when r.done < 3 then case when v_j = 1 then 1 else 0 end
+                    else (array[10, 5, 2, 7, 0])[v_j] end;
 
       -- Award packages that are past the award stage (5).
       if v_lvl >= 5 then

@@ -1,6 +1,11 @@
+import { UploadIcon } from 'lucide-react'
+import { useState } from 'react'
 import { NavLink, Navigate, useParams } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/features/auth/auth-context'
 import { cn } from '@/lib/utils'
 import { MASTER_LISTS, MASTER_LIST_BY_KEY, type MasterListKey } from '../master-lists/config'
+import { ImportLocationsDialog } from '../master-lists/ImportLocationsDialog'
 import { MasterListEditor } from '../master-lists/MasterListEditor'
 
 const GROUPS = [
@@ -15,6 +20,8 @@ export default function MasterListsSettings() {
   const { '*': rest } = useParams()
   const key = rest?.split('/')[0] as MasterListKey | undefined
   const def = key ? MASTER_LIST_BY_KEY[key] : undefined
+  const { isSuperadmin } = useAuth()
+  const [importing, setImporting] = useState(false)
 
   if (!def) return <Navigate to={`/settings/master-lists/${MASTER_LISTS[0].key}`} replace />
 
@@ -47,9 +54,16 @@ export default function MasterListsSettings() {
         ))}
       </nav>
       <section className="min-w-0 space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">{def.label}</h2>
-          <p className="text-muted-foreground text-sm">{def.description}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">{def.label}</h2>
+            <p className="text-muted-foreground text-sm">{def.description}</p>
+          </div>
+          {def.group === 'Locations' && isSuperadmin && (
+            <Button variant="outline" size="sm" onClick={() => setImporting(true)}>
+              <UploadIcon /> Import from PSGC
+            </Button>
+          )}
         </div>
         {/* key resets local state (filters, dialogs) when switching lists */}
         <MasterListEditor
@@ -58,6 +72,7 @@ export default function MasterListsSettings() {
           scope={def.key === 'activity_categories' ? { programId: null } : {}}
         />
       </section>
+      {importing && <ImportLocationsDialog onClose={() => setImporting(false)} />}
     </div>
   )
 }
