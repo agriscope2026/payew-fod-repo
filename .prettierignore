@@ -1,0 +1,5 @@
+dist
+node_modules
+supabase/.temp
+src/types/database.ts
+*.sql
