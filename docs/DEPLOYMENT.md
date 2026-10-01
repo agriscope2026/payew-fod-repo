@@ -155,6 +155,7 @@ One-time setup:
 - **GitHub → Settings → General → Default branch:** `dev`.
 - **GitHub → Settings → Branches → Add rule** for `prod`: require a pull request and the `CI / check` status, and block force pushes and deletion. A lighter rule on `dev` (block force pushes and deletion) is enough.
 - **Vercel → Settings → Git → Production Branch:** `prod`. Pushes to `dev` then build preview deployments.
+  - **Before go-live** (test data only), the Production Branch may be `dev`, so every push to `dev` updates the site. In that case `prod` isn't deployed anywhere yet. At go-live, switch the Production Branch to `prod` and the Production environment variables to the production Supabase project at the same time.
 - **Vercel → Settings → Environment Variables:** set the production Supabase URL and anon key for **Production**, and the dev Supabase project's values for **Preview**. Otherwise testing on `dev` writes into the real data.
 - **Two Supabase projects** (for example `payew-prod` and `payew-dev`), each set up as in steps 1–4. The dev project may load the demo seed (`supabase db push --include-seed`); production never does. Add the dev preview address to the dev project's redirect URLs and R2 CORS rule, or use a separate dev bucket.
 
