@@ -10,26 +10,26 @@ the money level by level: **allotment → obligation → disbursement → balanc
 
 ## Stack
 
-| Layer | Tech |
-|---|---|
+| Layer    | Tech                                                                                                                                         |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Frontend | Vite, React 19, TypeScript (strict), React Router 7, TanStack Query, Tailwind CSS 4 + shadcn-style components (Radix), React Hook Form + Zod |
-| Backend | Supabase (Postgres, Auth, RLS, Realtime, Edge Functions, pg_cron) |
-| Files | Cloudflare R2 via presigned URLs from an Edge Function (Phase 3) |
-| Hosting | Cloudflare Pages |
+| Backend  | Supabase (Postgres, Auth, RLS, Realtime, Edge Functions, pg_cron)                                                                            |
+| Files    | Cloudflare R2 via presigned URLs from an Edge Function (Phase 3)                                                                             |
+| Hosting  | Cloudflare Pages                                                                                                                             |
 
 ## Build status
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Scaffold, schema foundation, RLS, auth, role routing, app shell, notification bell, global search shell | ✅ |
-| 2 | Settings (programs, fiscal years, master lists, system config, data export) and Users Management (create, edit, reset password, deactivate, force logout) | ✅ |
-| 3 | R2 file storage (presigned URLs), reusable attachments panel, Document Repository (versions, Trash, preview) | ✅ |
-| 4 | Beneficiaries registry (shared, fuzzy duplicate check, Excel import/export, map) + reusable cascading location dropdowns | ✅ |
-| 5 | Activities (table/board, create/edit, detail with workflow, checklist, beneficiaries, attachments, history) + workflow engine (default + per-program templates) | ✅ |
-| 6 | Comments (threads, @mentions, visibility), notes, directives & "Send Overdue Notice", notification system (assignments, preferences, daily pg_cron reminders and 3-level escalation) | ✅ |
-| 6B | **Addendum B catch-up:** Suppliers master list & profile, procurement packages per activity with their own parallel package workflow, derived activity status, Packages tab | next |
-| 7 | Finance grid + **package-based** Financial Tracker (multiple obligations, deliveries, disbursements) | planned |
-| 8–12 | Approvals, progress/issues, dashboard, calendar/tasks/reports, admin pages, seed/tests/deploy (incl. Addendum B effects) | planned |
+| Phase | Scope                                                                                                                                                                                | Status  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| 1     | Scaffold, schema foundation, RLS, auth, role routing, app shell, notification bell, global search shell                                                                              | ✅      |
+| 2     | Settings (programs, fiscal years, master lists, system config, data export) and Users Management (create, edit, reset password, deactivate, force logout)                            | ✅      |
+| 3     | R2 file storage (presigned URLs), reusable attachments panel, Document Repository (versions, Trash, preview)                                                                         | ✅      |
+| 4     | Beneficiaries registry (shared, fuzzy duplicate check, Excel import/export, map) + reusable cascading location dropdowns                                                             | ✅      |
+| 5     | Activities (table/board, create/edit, detail with workflow, checklist, beneficiaries, attachments, history) + workflow engine (default + per-program templates)                      | ✅      |
+| 6     | Comments (threads, @mentions, visibility), notes, directives & "Send Overdue Notice", notification system (assignments, preferences, daily pg_cron reminders and 3-level escalation) | ✅      |
+| 6B    | **Addendum B catch-up:** Suppliers master list & profile, procurement packages per activity with their own parallel package workflow, derived activity status, Packages tab    | next    |
+| 7     | Finance grid +**package-based** Financial Tracker (multiple obligations, deliveries, disbursements)                                                                            | planned |
+| 8–12 | Approvals, progress/issues, dashboard, calendar/tasks/reports, admin pages, seed/tests/deploy (incl. Addendum B effects)                                                             | planned |
 
 Spec addenda live in [docs/spec/](docs/spec/).
 
@@ -87,22 +87,22 @@ npm run dev                           # http://localhost:5173
 
 ### Seeded accounts (dev only), password `Payew@2026`
 
-| Role | Email |
-|---|---|
-| Superadmin | `superadmin@payew.local` |
-| Program admins | `amia.admin@`, `apa.admin@`, `hvc.admin@`, `rice.admin@`, `corn.admin@payew.local` |
-| Program staff | `<code>.staff1@payew.local`, `<code>.staff2@payew.local` |
-| Forced password change demo | `amia.staff2@payew.local` |
+| Role                        | Email                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| Superadmin                  | `superadmin@payew.local`                                                                   |
+| Program admins              | `amia.admin@`, `apa.admin@`, `hvc.admin@`, `rice.admin@`, `corn.admin@payew.local` |
+| Program staff               | `<code>.staff1@payew.local`, `<code>.staff2@payew.local`                                 |
+| Forced password change demo | `amia.staff2@payew.local`                                                                  |
 
 ## Scripts
 
-| Script | Purpose |
-|---|---|
-| `npm run dev` / `build` / `preview` | Vite |
-| `npm run lint` / `typecheck` / `format` | Quality |
-| `npm test` | Unit tests + database tests |
-| `npm run db:check` | Runs every migration + seed in **PGlite** (in-process Postgres) and the RLS test suite, no Docker required |
-| `npm run db:types` | Regenerate Supabase TypeScript types from the local DB |
+| Script                                        | Purpose                                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `preview`     | Vite                                                                                                            |
+| `npm run lint` / `typecheck` / `format` | Quality                                                                                                         |
+| `npm test`                                  | Unit tests + database tests                                                                                     |
+| `npm run db:check`                          | Runs every migration + seed in**PGlite** (in-process Postgres) and the RLS test suite, no Docker required |
+| `npm run db:types`                          | Regenerate Supabase TypeScript types from the local DB                                                          |
 
 ## Security model (Phase 1)
 
@@ -116,12 +116,12 @@ npm run dev                           # http://localhost:5173
 
 ## User administration (Phase 2)
 
-| Action | Who | Where it runs |
-|---|---|---|
-| Create account | Superadmin (any role), Program admin (staff of own program) | `admin-users` Edge Function → `auth.admin.createUser` |
-| Reset password (temporary or emailed link) | Same scope | `admin-users` Edge Function |
-| Edit profile, toggle *can edit activities*, deactivate/reactivate | Same scope; role/program changes superadmin only | `admin_update_user()` RPC |
-| Force logout | Same scope | `admin_force_logout()` RPC: deletes sessions and rejects older tokens immediately |
+| Action                                                             | Who                                                         | Where it runs                                                                       |
+| ------------------------------------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Create account                                                     | Superadmin (any role), Program admin (staff of own program) | `admin-users` Edge Function → `auth.admin.createUser`                          |
+| Reset password (temporary or emailed link)                         | Same scope                                                  | `admin-users` Edge Function                                                       |
+| Edit profile, toggle*can edit activities*, deactivate/reactivate | Same scope; role/program changes superadmin only            | `admin_update_user()` RPC                                                         |
+| Force logout                                                       | Same scope                                                  | `admin_force_logout()` RPC: deletes sessions and rejects older tokens immediately |
 
 Authorization lives in SQL (`can_admin_user()`), so the Edge Function and the RPCs enforce the same rules.
 Both are covered by `tests/db/user-admin.test.ts`. New accounts always start with
@@ -181,6 +181,7 @@ npx supabase db query --linked -f supabase/seeds/02_beneficiaries.sql
 npx supabase db query --linked -f supabase/seeds/03_activities.sql
 npx supabase db query --linked -f supabase/seeds/04_collaboration.sql
 ```
+
 In Dashboard → Authentication → URL Configuration, set Site URL `http://localhost:5173` and add the redirect `http://localhost:5173/reset-password`.
 
 ## Deployment (summary; full guide in Phase 12)
