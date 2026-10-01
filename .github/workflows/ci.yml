@@ -27,6 +27,9 @@ jobs:
       # Unit tests + database tests (migrations, RLS, RPCs, seed scenarios) on in-memory Postgres (PGlite).
       - name: Test
         run: npm test
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
       - name: Build
         run: npm run build
         env:
