@@ -257,7 +257,7 @@ function MyResponse({
         </CardTitle>
         <CardDescription>
           {isNotice
-            ? 'Give a status update and a revised target date. Extensions themselves go through Approvals (Phase 8).'
+            ? 'Give a status update and a revised target date. To move the due date, submit an extension request from the activity page.'
             : 'Acknowledge that you have read it, then respond when done.'}
         </CardDescription>
       </CardHeader>

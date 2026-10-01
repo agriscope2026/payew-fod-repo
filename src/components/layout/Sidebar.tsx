@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { Logo } from '@/components/common/Logo'
 import { useAuth } from '@/features/auth/auth-context'
 import { ROLE_LABELS } from '@/features/auth/permissions'
+import { usePendingDecisions } from '@/features/approvals/api'
 import { useMyPendingDirectives } from '@/features/directives/api'
 import { useUnreadCount } from '@/features/notifications/api'
 import { cn } from '@/lib/utils'
@@ -12,9 +13,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const sections = navForRole(role)
   const { data: pendingDirectives = 0 } = useMyPendingDirectives()
   const { data: unread = 0 } = useUnreadCount()
+  const { data: decisions = 0 } = usePendingDecisions()
   const counts: Record<string, number> = {
     '/directives': pendingDirectives,
     '/notifications': unread,
+    '/approvals': decisions,
   }
   const programLabel =
     role === 'superadmin' ? 'All programs' : programs.map((p) => p.code).join(', ') || '—'

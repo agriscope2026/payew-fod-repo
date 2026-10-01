@@ -40,6 +40,15 @@ export default function SystemSettings() {
           }
         }
       />
+      <ApprovalsCard
+        initial={
+          data.approvals ?? {
+            admin_actions_need_superadmin: false,
+            reminder_days: 3,
+            progress_update_days: 30,
+          }
+        }
+      />
       <RemindersCard
         initial={
           data.reminders ?? {
@@ -243,6 +252,57 @@ function OverdueTemplateCard({ initial }: { initial: AppSettings['overdue_notice
         <p className="text-muted-foreground mb-1 text-xs font-medium">Preview</p>
         <p className="font-medium">{fill(value.title)}</p>
         <p>{fill(value.body)}</p>
+      </div>
+    </SettingCard>
+  )
+}
+
+function ApprovalsCard({ initial }: { initial: AppSettings['approvals'] }) {
+  const [value, setValue] = useState(initial)
+  const saver = useSaver('approvals', 'Approval settings')
+  const invalid = value.reminder_days < 1 || value.progress_update_days < 7
+  return (
+    <SettingCard
+      title="Approvals & monitoring"
+      description="Staff requests are decided by program admins; program admins' requests by the superadmin. Extending an ongoing activity or package always needs an admin."
+      saving={saver.saving}
+      error={invalid ? 'Reminders: at least 1 day; progress updates: at least every 7 days.' : null}
+      onSave={() => !invalid && void saver.run(value)}
+    >
+      <label className="flex items-start gap-3 text-sm">
+        <Switch
+          checked={value.admin_actions_need_superadmin}
+          onCheckedChange={(v) => setValue({ ...value, admin_actions_need_superadmin: v })}
+        />
+        <span>
+          Program admins need superadmin approval to cancel, re-award, change contract amounts,
+          extend, change workflows and realign
+          <span className="text-muted-foreground block text-xs">
+            Off: program admins act directly (audited). On: they submit requests like staff.
+          </span>
+        </span>
+      </label>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField id="ap-rem" label="Remind approvers after (days)">
+          <Input
+            id="ap-rem"
+            type="number"
+            min={1}
+            max={30}
+            value={value.reminder_days}
+            onChange={(e) => setValue({ ...value, reminder_days: Number(e.target.value) })}
+          />
+        </FormField>
+        <FormField id="ap-prog" label="Progress update every (days)">
+          <Input
+            id="ap-prog"
+            type="number"
+            min={7}
+            max={90}
+            value={value.progress_update_days}
+            onChange={(e) => setValue({ ...value, progress_update_days: Number(e.target.value) })}
+          />
+        </FormField>
       </div>
     </SettingCard>
   )

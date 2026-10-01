@@ -75,7 +75,7 @@ begin
   insert into public.activities (
     id, program_id, fiscal_year_id, title, description, objectives, target_output, target_quantity, unit_id,
     category_id, province_id, municipality_id, start_date, end_date, due_date, budget_amount, fund_source_id,
-    responsible_user_id, responsible_unit
+    responsible_user_id, responsible_unit, workflow_template_id
   )
   select a.id, pr.id, fy.id, a.title,
          'Implementation of "' || a.title || '" under the ' || pr.name || '.',
@@ -84,7 +84,8 @@ begin
          a.qty, u.id, c.id, pv.id, mu.id,
          a.start_date, a.due_date - 7, a.due_date, a.budget,
          (select id from public.fund_sources where code = 'GAA'),
-         p.id, 'Field Operations Division'
+         p.id, 'Field Operations Division',
+         '40000000-0000-4000-8000-000000000001'::uuid -- classic workflow; 05_* moves open ones to packages
   from _seed_activities a
   join public.programs pr on pr.code = a.program
   join public.fiscal_years fy on fy.year = a.fy

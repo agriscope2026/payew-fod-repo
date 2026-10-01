@@ -10,6 +10,7 @@ const TABLE_LABEL: Record<string, string> = {
   activity_stage_progress: 'Stage',
   activity_tasks: 'Checklist item',
   activity_beneficiaries: 'Beneficiary link',
+  procurement_packages: 'Package',
 }
 
 const IGNORED = new Set([
@@ -43,9 +44,28 @@ const TRANSITION_LABEL: Record<StageTransitionRow['action'], string> = {
   skip: 'Skipped',
   reopen: 'Moved back to',
   migrate: 'Changed workflow',
-  cancel: 'Cancelled activity',
-  uncancel: 'Restored activity',
+  cancel: 'Cancelled',
+  uncancel: 'Restored',
+  award: 'Awarded',
+  re_award: 'Re-awarded',
+  contract_change: 'Changed contract',
+  split: 'Split',
+  merge: 'Merged',
+  reorder: 'Reordered stages',
 }
+
+/** Package events carry their own description in the note. */
+const SELF_DESCRIBING = new Set<StageTransitionRow['action']>([
+  'migrate',
+  'cancel',
+  'uncancel',
+  'award',
+  're_award',
+  'contract_change',
+  'split',
+  'merge',
+  'reorder',
+])
 
 export function TransitionLog({
   transitions,
@@ -61,7 +81,7 @@ export function TransitionLog({
       {transitions.map((t) => (
         <li key={t.id} className="text-sm">
           <span className="font-medium">{TRANSITION_LABEL[t.action]}</span>{' '}
-          {t.action !== 'migrate' && !t.action.includes('cancel') && t.stage_name}
+          {!SELF_DESCRIBING.has(t.action) && t.stage_name}
           <span className="text-muted-foreground block text-xs">
             {formatDateTime(t.created_at)} · {personName(t.created_by) || 'System'}
             {t.note && ` · “${t.note}”`}

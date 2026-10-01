@@ -10,7 +10,7 @@ import {
   SkipForwardIcon,
   UserIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/FormField'
 import { Badge } from '@/components/ui/badge'
@@ -26,41 +26,50 @@ import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
 import { Textarea } from '@/components/ui/textarea'
 import { ROLE_LABELS } from '@/features/auth/permissions'
-import { FIELD_LABEL } from '@/features/workflows/constants'
+
 import { formatDate, todayManila } from '@/lib/format'
 import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import type { ActivityTaskRow, ActivityView, StageProgressRow } from '@/types/database'
+import type { ActivityTaskRow, StageProgressRow } from '@/types/database'
 import { useStageAction, useUpdateStagePlan, type StageAction } from '../api'
 import { stageLateness } from '../stage-utils'
 
-/** Required fields still empty on the activity (mirrors activity_missing_fields in SQL). */
-function missingFields(activity: ActivityView, fields: string[]) {
-  return fields.filter((f) => {
-    if (f === 'beneficiaries') return activity.beneficiaries_count === 0
-    const v = (activity as unknown as Record<string, unknown>)[f]
-    return v === null || v === undefined || String(v).trim() === ''
-  })
-}
-
 interface Props {
-  activity: ActivityView
   stages: StageProgressRow[]
   tasks: ActivityTaskRow[]
+  /** False when the activity/package is cancelled or in Trash (read-only stepper). */
+  active: boolean
   canEdit: boolean
   canManage: boolean
   members: { id: string; full_name: string }[]
   personName: (id: string | null) => string
+  /** Required fields still empty on the record (mirrors *_missing_fields in SQL). */
+  missingFields: (fields: string[]) => string[]
+  fieldLabels: Record<string, string>
+  /** Where to fill the fields, e.g. "Edit activity". */
+  editHint: string
+  /** Activity track: open packages (an override needs a justification) and their summary. */
+  openPackages?: number
+  packagesSlot?: ReactNode
+  /** Offer "Request skip" on the current stage when it can't be skipped directly. */
+  onRequestSkip?: (stage: StageProgressRow) => void
 }
 
+/** Stage list with actions for one track: an activity's own stages or one package's. */
 export function WorkflowStepper({
-  activity,
   stages,
   tasks,
+  active,
   canEdit,
   canManage,
   members,
   personName,
+  missingFields,
+  fieldLabels,
+  editHint,
+  openPackages = 0,
+  packagesSlot,
+  onRequestSkip,
 }: Props) {
   const [dialog, setDialog] = useState<{ stage: StageProgressRow; action: StageAction } | null>(
     null,
@@ -68,7 +77,6 @@ export function WorkflowStepper({
   const [planning, setPlanning] = useState<StageProgressRow | null>(null)
   const top = stages.filter((s) => !s.parent_id).sort((a, b) => a.sort_order - b.sort_order)
   const current = top.find((s) => s.status === 'pending' || s.status === 'in_progress')
-  const active = activity.status !== 'cancelled' && !activity.deleted_at
   const openTasks = (stageId: string) =>
     tasks.filter((t) => t.stage_progress_id === stageId && t.is_required && !t.is_done)
   const doneTasks = (stageId: string) =>
@@ -103,12 +111,16 @@ export function WorkflowStepper({
                       stage={stage}
                       allowed={isCurrent}
                       canManage={canManage}
+                      onRequestSkip={onRequestSkip && (() => onRequestSkip(stage))}
                       onAction={(action) => setDialog({ stage, action })}
                       onPlan={() => setPlanning(stage)}
                     />
                   ) : null
                 }
               >
+                {stage.tracks_packages && packagesSlot && (
+                  <div className="mt-3 border-t pt-3">{packagesSlot}</div>
+                )}
                 {subs.length > 0 && (
                   <ul className="mt-3 space-y-1.5 border-t pt-3">
                     {subs.map((sub) => (
@@ -168,7 +180,8 @@ export function WorkflowStepper({
                 )}
                 {isCurrent && active && (
                   <Requirements
-                    missing={missingFields(activity, stage.required_fields)}
+                    missing={missingFields(stage.required_fields).map((f) => fieldLabels[f] ?? f)}
+                    editHint={editHint}
                     openTasks={openTasks(stage.id)}
                     openSubs={
                       subs.filter((s) => s.status !== 'completed' && s.status !== 'skipped').length
@@ -185,6 +198,7 @@ export function WorkflowStepper({
         <StageActionDialog
           stage={dialog.stage}
           action={dialog.action}
+          openPackages={dialog.stage.tracks_packages ? openPackages : 0}
           onClose={() => setDialog(null)}
         />
       )}
@@ -324,12 +338,14 @@ function StageActions({
   canManage,
   onAction,
   onPlan,
+  onRequestSkip,
 }: {
   stage: StageProgressRow
   allowed: boolean
   canManage: boolean
   onAction: (a: StageAction) => void
   onPlan: () => void
+  onRequestSkip?: () => void
 }) {
   const finished = stage.status === 'completed' || stage.status === 'skipped'
   return (
@@ -349,12 +365,22 @@ function StageActions({
           <SkipForwardIcon /> Skip
         </Button>
       )}
+      {allowed && !finished && !stage.skippable && onRequestSkip && !stage.tracks_packages && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRequestSkip}
+          title="Required stage: skipping needs approval"
+        >
+          <SkipForwardIcon /> Request skip
+        </Button>
+      )}
       {finished && canManage && (
         <Button
           size="sm"
           variant="ghost"
           onClick={() => onAction('reopen')}
-          title="Move the activity back to this stage"
+          title="Move the workflow back to this stage"
         >
           <RotateCcwIcon /> Move back here
         </Button>
@@ -376,10 +402,12 @@ function StageActions({
 
 function Requirements({
   missing,
+  editHint,
   openTasks,
   openSubs,
 }: {
   missing: string[]
+  editHint: string
   openTasks: ActivityTaskRow[]
   openSubs: number
 }) {
@@ -389,7 +417,9 @@ function Requirements({
       <p className="mb-1 font-medium">Before completing this stage:</p>
       <ul className="list-inside list-disc space-y-0.5">
         {missing.length > 0 && (
-          <li>Fill in: {missing.map((f) => FIELD_LABEL[f] ?? f).join(', ')} (Edit activity)</li>
+          <li>
+            Fill in: {missing.join(', ')} ({editHint})
+          </li>
         )}
         {openTasks.map((t) => (
           <li key={t.id}>
@@ -426,17 +456,21 @@ const ACTION_COPY: Record<
 function StageActionDialog({
   stage,
   action,
+  openPackages,
   onClose,
 }: {
   stage: StageProgressRow
   action: StageAction
+  openPackages: number
   onClose: () => void
 }) {
   const run = useStageAction()
   const [date, setDate] = useState(todayManila())
   const [note, setNote] = useState('')
   const copy = ACTION_COPY[action]
-  const noteMissing = copy.noteRequired && !note.trim()
+  const override = action === 'complete' && openPackages > 0
+  const noteRequired = copy.noteRequired || override
+  const noteMissing = noteRequired && !note.trim()
 
   const submit = async () => {
     try {
@@ -466,6 +500,12 @@ function StageActionDialog({
             {action === 'reopen' && '. Later stages return to pending and are logged.'}
           </DialogDescription>
         </DialogHeader>
+        {override && (
+          <p className="border-warning/50 bg-warning/10 rounded-md border p-2.5 text-sm">
+            {openPackages} package{openPackages === 1 ? ' is' : 's are'} still open. Completing now
+            is an admin override: give the justification (it is recorded in the history).
+          </p>
+        )}
         <div className="space-y-4">
           {action !== 'reopen' && (
             <FormField id="stage-date" label={copy.dateLabel}>
@@ -480,7 +520,9 @@ function StageActionDialog({
           )}
           <FormField
             id="stage-note"
-            label={copy.noteRequired ? 'Reason *' : 'Note (optional)'}
+            label={
+              override ? 'Override justification *' : noteRequired ? 'Reason *' : 'Note (optional)'
+            }
             error={noteMissing && note !== '' ? 'Required' : undefined}
           >
             <Textarea

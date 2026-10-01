@@ -23,7 +23,7 @@ import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import type { WorkflowStageRow, WorkflowTemplateRow } from '@/types/database'
 import { toDrafts, useSaveTemplate, type StageDraft } from '../api'
-import { PHASES, REQUIRED_FIELD_OPTIONS } from '../constants'
+import { PACKAGE_FIELD_OPTIONS, PHASES, REQUIRED_FIELD_OPTIONS } from '../constants'
 
 const newStage = (phase: StageDraft['phase_key'] = 'other'): StageDraft => ({
   key: crypto.randomUUID(),
@@ -35,6 +35,7 @@ const newStage = (phase: StageDraft['phase_key'] = 'other'): StageDraft => ({
   required_documents: [],
   required_fields: [],
   skippable: false,
+  tracks_packages: false,
   substeps: [],
 })
 
@@ -63,6 +64,7 @@ export function WorkflowEditor({
   const [drafts, setDrafts] = useState<StageDraft[]>(() => toDrafts(stages))
   const [open, setOpen] = useState<string | null>(null)
 
+  const isPackage = template.scope === 'package'
   const totalDays = drafts.reduce((a, s) => a + (Number(s.expected_days) || 0), 0)
   const invalid =
     !name.trim() ||
@@ -87,7 +89,9 @@ export function WorkflowEditor({
     try {
       await save.mutateAsync({ id: template.id, name, description, stages: drafts })
       toast.success(
-        'Workflow saved. New activities will use it; existing ones keep their current stages.',
+        isPackage
+          ? 'Package workflow saved. New packages will use it; existing ones keep their stages.'
+          : 'Workflow saved. New activities will use it; existing ones keep their current stages.',
       )
       onDone()
     } catch (err) {
@@ -135,6 +139,15 @@ export function WorkflowEditor({
               index={i}
               count={drafts.length}
               readOnly={readOnly}
+              isPackage={isPackage}
+              onContainer={(on) =>
+                setDrafts(
+                  drafts.map((d, j) => ({
+                    ...d,
+                    tracks_packages: j === i ? on : on ? false : d.tracks_packages,
+                  })),
+                )
+              }
               expanded={open === stage.key}
               onToggle={() => setOpen(open === stage.key ? null : stage.key)}
               onChange={(patch) => updateAt([i], patch)}
@@ -152,6 +165,7 @@ export function WorkflowEditor({
                         index={j}
                         count={stage.substeps.length}
                         readOnly={readOnly}
+                        isPackage={isPackage}
                         compact
                         expanded={open === sub.key}
                         onToggle={() => setOpen(open === sub.key ? null : sub.key)}
@@ -206,6 +220,8 @@ function StageRow({
   index,
   count,
   readOnly,
+  isPackage,
+  onContainer,
   compact,
   expanded,
   onToggle,
@@ -217,6 +233,9 @@ function StageRow({
   index: number
   count: number
   readOnly: boolean
+  isPackage: boolean
+  /** Activity workflows: mark this stage as the one holding the packages (only one). */
+  onContainer?: (on: boolean) => void
   compact?: boolean
   expanded: boolean
   onToggle: () => void
@@ -227,6 +246,7 @@ function StageRow({
   const { data: docTypes = [] } = useMasterList('document_types', {}, { activeOnly: true })
   const toggleIn = (list: string[], v: string, on: boolean) =>
     on ? [...list, v] : list.filter((x) => x !== v)
+  const fieldOptions = isPackage ? PACKAGE_FIELD_OPTIONS : REQUIRED_FIELD_OPTIONS
 
   return (
     <div className="p-2">
@@ -260,6 +280,9 @@ function StageRow({
           onChange={(e) => onChange({ name: e.target.value })}
           className={cn('h-8 min-w-48 flex-1', !stage.name.trim() && 'border-destructive')}
         />
+        {stage.tracks_packages && (
+          <span className="bg-gold/25 rounded px-1.5 py-0.5 text-[11px] font-medium">Packages</span>
+        )}
         <SelectNative
           aria-label="Phase"
           className="w-44"
@@ -363,7 +386,23 @@ function StageRow({
                 />
                 Can be skipped
               </label>
+              {!isPackage && !compact && onContainer && (
+                <label className="flex items-center gap-2 pb-2 text-sm">
+                  <Switch
+                    checked={stage.tracks_packages}
+                    disabled={readOnly}
+                    onCheckedChange={onContainer}
+                  />
+                  Holds the procurement packages
+                </label>
+              )}
             </div>
+            {stage.tracks_packages && (
+              <p className="text-muted-foreground text-xs">
+                Completes automatically when every package is closed; admins can override with a
+                justification.
+              </p>
+            )}
           </div>
           <div className="space-y-3">
             <fieldset>
@@ -396,7 +435,7 @@ function StageRow({
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">Fields required to complete</legend>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {REQUIRED_FIELD_OPTIONS.map((f) => (
+                {fieldOptions.map((f) => (
                   <label key={f.key} className="flex items-center gap-1.5 text-xs">
                     <Checkbox
                       checked={stage.required_fields.includes(f.key)}

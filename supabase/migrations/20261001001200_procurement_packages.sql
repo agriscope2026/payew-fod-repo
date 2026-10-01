@@ -1373,7 +1373,9 @@ begin
   end if;
   foreach pid in array p_package_ids loop
     v_pkg := public.lock_package(pid, true);
-    v_first := coalesce(v_first, v_pkg);
+    if v_first.id is null then
+      v_first := v_pkg;
+    end if;
     if v_pkg.activity_id <> v_first.activity_id then
       raise exception 'Only packages of the same activity can be merged' using errcode = '22023';
     end if;

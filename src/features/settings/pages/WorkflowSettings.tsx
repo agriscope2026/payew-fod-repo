@@ -44,7 +44,8 @@ import {
 } from '@/features/workflows/api'
 import { WorkflowEditor } from '@/features/workflows/components/WorkflowEditor'
 import { errorMessage } from '@/lib/supabase'
-import type { WorkflowTemplateRow } from '@/types/database'
+import { cn } from '@/lib/utils'
+import type { WorkflowScope, WorkflowTemplateRow } from '@/types/database'
 
 const DA_WIDE = '__da__'
 
@@ -67,16 +68,18 @@ export default function WorkflowSettings() {
       .map((p) => ({ id: p.id, label: `${p.code} · ${p.name}` })),
   ]
   const [scope, setScope] = useState(scopes[0]?.id ?? DA_WIDE)
+  const [level, setLevel] = useState<WorkflowScope>('activity')
   const programId = scope === DA_WIDE ? null : scope
   const [editingId, setEditingId] = useState<string | null>(null)
   const editing = templates.find((t) => t.id === editingId) ?? null
   const [creating, setCreating] = useState(false)
 
   const inScope = useMemo(
-    () => templates.filter((t) => t.program_id === programId),
-    [templates, programId],
+    () => templates.filter((t) => t.program_id === programId && t.scope === level),
+    [templates, programId, level],
   )
-  const daWide = templates.filter((t) => t.program_id === null && t.is_active)
+  const daWide = templates.filter((t) => t.program_id === null && t.is_active && t.scope === level)
+  const noun = level === 'package' ? 'packages' : 'activities'
   const canManageScope =
     programId === null ? isSuperadmin : canManageProgram(profile, programIds, programId)
 
@@ -92,11 +95,40 @@ export default function WorkflowSettings() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-muted-foreground max-w-2xl text-sm">
-          New activities start from their program's default workflow (or the DA-wide default).
-          Editing a workflow never changes activities already created. Admins can switch an existing
-          activity to an updated workflow from its page.
-        </p>
+        <div className="space-y-3">
+          <div
+            className="bg-card inline-flex rounded-md border p-0.5"
+            role="group"
+            aria-label="Workflow level"
+          >
+            {(
+              [
+                ['activity', 'Activity workflows'],
+                ['package', 'Package workflows'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={level === value}
+                onClick={() => setLevel(value)}
+                className={cn(
+                  'rounded px-3 py-1 text-sm',
+                  level === value ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-muted-foreground max-w-2xl text-sm">
+            {level === 'activity'
+              ? "An activity's own lifecycle (design → approval → PPMP → procurement & implementation → liquidation → closed). Its packages stage completes when every supplier package is closed."
+              : 'The steps each supplier/package runs through in parallel (specs → PR → solicitation → award → delivery → inspection → ORS → DV). The obligation step can be moved before delivery per package.'}{' '}
+            New {noun} use their program's default (or the DA-wide default); editing a workflow
+            never changes {noun} already created.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           {scopes.length > 1 && (
             <SelectNative
@@ -200,8 +232,8 @@ export default function WorkflowSettings() {
               <CardContent>
                 <EmptyState
                   icon={GitBranchIcon}
-                  title="No program workflows yet"
-                  description="This program uses the DA-wide default. Create a copy to customize stages for your program."
+                  title={`No program ${level} workflows yet`}
+                  description={`This program uses the DA-wide default for ${noun}. Create a copy to customize the stages for your program.`}
                 />
               </CardContent>
             </Card>
@@ -237,7 +269,7 @@ export default function WorkflowSettings() {
         onOpenChange={setCreating}
         sources={[...daWide, ...inScope.filter((t) => t.is_active && t.program_id !== null)]}
         onCreate={async (name, copyFrom) => {
-          const id = await create.mutateAsync({ programId, name, copyFrom })
+          const id = await create.mutateAsync({ programId, name, copyFrom, scope: level })
           toast.success('Workflow created')
           setCreating(false)
           setEditingId(id) // opens once the refreshed list contains it

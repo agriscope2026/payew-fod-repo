@@ -15,6 +15,7 @@ import { useTaskMutations } from '../api'
 /** Checklist grouped by stage. Document items tick themselves when a matching file is attached. */
 export function TasksPanel({
   activityId,
+  packageId = null,
   tasks,
   stages,
   canEdit,
@@ -22,13 +23,15 @@ export function TasksPanel({
   personName,
 }: {
   activityId: string
+  /** Checklist of one package instead of the activity's own track. */
+  packageId?: string | null
   tasks: ActivityTaskRow[]
   stages: StageProgressRow[]
   canEdit: boolean
   members: { id: string; full_name: string }[]
   personName: (id: string | null) => string
 }) {
-  const { add, toggle, remove } = useTaskMutations(activityId)
+  const { add, toggle, remove } = useTaskMutations(activityId, packageId)
   const [title, setTitle] = useState('')
   const [stageId, setStageId] = useState('')
   const [due, setDue] = useState('')

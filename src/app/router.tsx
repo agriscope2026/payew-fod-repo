@@ -21,6 +21,9 @@ const RepositoryPage = lazy(() => import('@/features/files/RepositoryPage'))
 const BeneficiariesModule = lazy(() => import('@/features/beneficiaries/BeneficiariesModule'))
 const ActivitiesModule = lazy(() => import('@/features/activities/ActivitiesModule'))
 const DirectivesModule = lazy(() => import('@/features/directives/DirectivesModule'))
+const SuppliersModule = lazy(() => import('@/features/suppliers/SuppliersModule'))
+const FinancePage = lazy(() => import('@/features/finance/FinancePage'))
+const ApprovalsModule = lazy(() => import('@/features/approvals/ApprovalsModule'))
 
 const BUILT: Record<string, ReactNode> = {
   '/dashboard': <DashboardPage />,
@@ -31,6 +34,9 @@ const BUILT: Record<string, ReactNode> = {
   '/beneficiaries': <BeneficiariesModule />,
   '/activities': <ActivitiesModule />,
   '/directives': <DirectivesModule />,
+  '/suppliers': <SuppliersModule />,
+  '/finance': <FinancePage />,
+  '/approvals': <ApprovalsModule />,
 }
 
 // Every nav item gets a route now; unbuilt modules render a placeholder.

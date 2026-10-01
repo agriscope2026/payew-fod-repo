@@ -133,6 +133,11 @@ export interface AppSettings {
   validation_strictness: 'warn' | 'block'
   dashboard_thresholds: Record<'utilization' | 'obligation_rate' | 'disbursement_rate', Thresholds>
   overdue_notice_template: { title: string; body: string; response_days: number }
+  approvals: {
+    admin_actions_need_superadmin: boolean
+    reminder_days: number
+    progress_update_days: number
+  }
   reminders: {
     stage_due_days: number
     directive_due_days: number

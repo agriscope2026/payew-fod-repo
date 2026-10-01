@@ -117,6 +117,8 @@ export const MUTABLE_TYPES = [
   ['stage', 'Stage moves and activity completion'],
   ['stage_due', 'Stage deadline reminders'],
   ['task_due', 'Checklist due-date reminders'],
+  ['delivery', 'Delivery schedules and late deliveries'],
+  ['progress', 'Progress update reminders'],
 ] as const
 
 export function useSaveNotificationPrefs() {
@@ -138,9 +140,17 @@ export function useRunSweep() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc('run_notification_sweep', {})
-      if (error) throw error
-      return data as Record<string, number | string>
+      const results = await Promise.all([
+        supabase.rpc('run_notification_sweep', {}),
+        supabase.rpc('run_finance_reminders', {}),
+        supabase.rpc('run_monitoring_reminders', {}),
+      ])
+      const merged: Record<string, number | string> = {}
+      for (const r of results) {
+        if (r.error) throw r.error
+        Object.assign(merged, r.data as Record<string, number | string>)
+      }
+      return merged
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.all }),
   })

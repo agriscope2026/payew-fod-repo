@@ -12,9 +12,15 @@ describe('stageLateness', () => {
   })
 
   it('uses the actual end for finished stages and ignores skipped ones', () => {
-    expect(stageLateness(stage({ status: 'completed', actual_end: '2026-03-12' }), '2026-09-01')).toBe(2)
-    expect(stageLateness(stage({ status: 'completed', actual_end: '2026-03-01' }), '2026-09-01')).toBe(0)
-    expect(stageLateness(stage({ status: 'skipped', actual_end: '2026-05-01' }), '2026-09-01')).toBe(0)
+    expect(
+      stageLateness(stage({ status: 'completed', actual_end: '2026-03-12' }), '2026-09-01'),
+    ).toBe(2)
+    expect(
+      stageLateness(stage({ status: 'completed', actual_end: '2026-03-01' }), '2026-09-01'),
+    ).toBe(0)
+    expect(
+      stageLateness(stage({ status: 'skipped', actual_end: '2026-05-01' }), '2026-09-01'),
+    ).toBe(0)
   })
 
   it('is zero without a plan', () => {

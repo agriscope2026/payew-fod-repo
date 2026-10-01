@@ -27,9 +27,10 @@ the money level by level: **allotment → obligation → disbursement → balanc
 | 4     | Beneficiaries registry (shared, fuzzy duplicate check, Excel import/export, map) + reusable cascading location dropdowns                                                             | ✅      |
 | 5     | Activities (table/board, create/edit, detail with workflow, checklist, beneficiaries, attachments, history) + workflow engine (default + per-program templates)                      | ✅      |
 | 6     | Comments (threads, @mentions, visibility), notes, directives & "Send Overdue Notice", notification system (assignments, preferences, daily pg_cron reminders and 3-level escalation) | ✅      |
-| 6B    | **Addendum B catch-up:** Suppliers master list & profile, procurement packages per activity with their own parallel package workflow, derived activity status, Packages tab    | next    |
-| 7     | Finance grid +**package-based** Financial Tracker (multiple obligations, deliveries, disbursements)                                                                            | planned |
-| 8–12 | Approvals, progress/issues, dashboard, calendar/tasks/reports, admin pages, seed/tests/deploy (incl. Addendum B effects)                                                             | planned |
+| 6B | **Addendum B:** Suppliers master list & profile (PhilGEPS/permit expiry, bank details admin-only, ratings, Excel import/export), procurement packages per activity with their own parallel package workflow, award/re-award/split/merge/cancel, obligation-before-delivery ordering, derived activity progress, Packages tab (table/board/timeline) | ✅ |
+| 7     | Finance: Excel-like WFP/PPMP/APP sheets (paste from Excel, import/export, submit/approve), allotments, package-based Financial Tracker (many ORS, partial deliveries, staged DVs linked to ORS), warn/block validations with flags, payables with aging, procurement savings, registers, daily delivery/payment reminders | ✅ |
+| 8     | Approvals (cancellation, extension, stage skip, workflow change, supplier re-award, contract variation, obligation-order exception, realignment) with auto-apply and admin→superadmin routing; progress updates (physical %, financial snapshot); issues & risks; monitoring reminders | ✅ |
+| 9–12 | Dashboard, calendar/tasks/reports, admin pages, seed/tests/deploy (incl. Addendum B effects) | planned |
 
 Spec addenda live in [docs/spec/](docs/spec/).
 
@@ -167,6 +168,33 @@ R2 setup: a private bucket, a CORS rule allowing `GET, PUT, HEAD` from your app 
 - **Notifications** go through `deliver()` (skips the actor, inactive users and muted types; de-duplicates). Users mute comment/mention/assignment/stage/deadline types under Notifications → Preferences; directives, overdue notices and escalations always arrive.
 - **Daily sweep** `run_notification_sweep()` runs at 07:00 Asia/Manila via pg_cron (`payew-notification-sweep`): stage/checklist/directive reminders, and escalation of overdue activities and unanswered directives — level 1 the person responsible, level 2 + program admins, level 3 + superadmins (thresholds in Settings → System → Reminders & escalation). The superadmin can run it on demand from the Notifications page.
 
+## Suppliers & procurement packages (Phase 6B · Addendum B)
+
+- **Two workflow levels.** An activity runs its own lifecycle (Default FOD Workflow: design → approval → PPMP → *Procurement & Implementation* → liquidation → savings → closed). Each supplier/lot is a **package** with its own track (Default Package Workflow: specs → PR → solicitation → evaluation → award → delivery → inspection → ORS → DV → closed). Both run through the same engine (`activity_stage_progress.package_id`).
+- **Derived progress.** The *Procurement & Implementation* stage completes automatically when every non-cancelled package is closed; a program admin may complete it earlier with a recorded justification.
+- **Obligation order** is per package (after delivery & inspection, or at award before delivery) and can be switched until delivery starts.
+- **Awards** go through `award_package` / `reaward_package`: blacklisted suppliers are blocked, suspended suppliers and expired PhilGEPS/permits warn, re-awards keep the previous supplier in `package_supplier_history`, contract changes need an admin and a reason. Savings = ABC − contract.
+- **Suppliers** are shared by all programs (everyone reads; superadmins/program admins edit; only superadmins blacklist). Bank details and performance remarks are admin-only. The daily sweep warns admins 30 days before supplier papers expire.
+- The classic 11-stage workflow stays available for single-supplier activities; existing activities keep it until switched.
+
+## Finance (Phase 7)
+
+- **Plans.** Finance → *WFP / PPMP / APP* opens one sheet per program and year in an Excel-like grid (arrow keys, type to edit, Ctrl+C/Ctrl+V with Excel, Shift-select, import/export .xlsx). Amount = qty × unit cost; rows whose monthly schedule doesn't add up to the amount are flagged. PPMP/APP rows can be tagged to a package. Draft → Submit → Approve (program admin); approved plans are read-only until reopened.
+- **Allotments** (SARO/SAA, realignments ±, reversions −) are entered by program admins; obligations are checked against the allotment of their expense class.
+- **Package Financial Tracker** (package → *Finance* tab): many ORS (optionally per delivery), many deliveries (partial, with items, DR/IAR, accepted/rejected), many DVs each charged to one or more ORS (staged payments, tax withheld, net). It shows obligated %, accepted %, paid %, unobligated balance, *obligated-but-undelivered* and *delivered-but-unpaid* (payables). The activity *Finance* tab rolls packages up (drill-down by package/supplier) and records activity-level expenses (honoraria, direct payments).
+- **Validations** (`save_obligation`, `save_delivery`, `save_disbursement`): ORS ≤ contract (or ABC), ORS ≤ activity budget, ORS ≤ allotment, deliveries ≤ contract, DV ≤ unpaid ORS. Settings → *validation strictness* decides: **block** rejects, **warn** saves and records the warning on the record (shown as flags). Delivering before any ORS on an *obligate-first* package needs an exception remark. Paying beyond accepted deliveries is flagged as an advance payment.
+- **Savings** = ABC − contract is suggested automatically on award (and re-suggested when the contract changes); program admins confirm or dismiss under Finance → *Savings*.
+- **Reminders** (`run_finance_reminders`, pg_cron `payew-finance-reminders`): deliveries due tomorrow, late deliveries, and accepted deliveries unpaid for 7+ days.
+
+## Approvals, progress & issues (Phase 8)
+
+- **Requests** (`submit_approval`): staff submit them from the activity/package *Request* menu, *Request skip* on required stages, and *Request realignment* in Finance → Allotments. A delivery recorded before its ORS on an obligate-first package raises an *obligation-order exception* automatically.
+- **Who decides** (`decide_approval`): program admins (or the superadmin) decide staff requests; the superadmin decides program admins' requests; nobody decides their own. Approving applies the change at once through the same RPCs as direct actions; rejecting needs a note. Requesters can withdraw pending requests.
+- **Gates**: extending the due date of an *ongoing* activity or package needs an admin. With Settings → System → *Approvals & monitoring* → "Program admins need superadmin approval…", program admins' cancellations, re-awards, contract changes, extensions, workflow changes and realignments also go through requests.
+- **Progress updates** record physical %, quantity and participants reached, a self-assessment (on track / at risk / delayed) and narrative; the obligated/disbursed amounts at that date are captured from the Financial Tracker.
+- **Issues & risks**: any program member can raise one; owners, raisers and writers update it; high/critical ones notify program admins (critical: also the superadmin); resolving requires a resolution.
+- **Reminders** (`run_monitoring_reminders`, pg_cron `payew-monitoring-reminders`): approvals waiting N days, overdue issues, and ongoing activities without a progress update in 30 days.
+
 ## Working against a hosted Supabase project
 
 ```bash
@@ -180,6 +208,9 @@ npx supabase functions deploy admin-users files
 npx supabase db query --linked -f supabase/seeds/02_beneficiaries.sql
 npx supabase db query --linked -f supabase/seeds/03_activities.sql
 npx supabase db query --linked -f supabase/seeds/04_collaboration.sql
+npx supabase db query --linked -f supabase/seeds/05_suppliers_packages.sql
+npx supabase db query --linked -f supabase/seeds/06_finance.sql
+npx supabase db query --linked -f supabase/seeds/07_monitoring.sql
 ```
 
 In Dashboard → Authentication → URL Configuration, set Site URL `http://localhost:5173` and add the redirect `http://localhost:5173/reset-password`.

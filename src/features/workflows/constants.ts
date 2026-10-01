@@ -43,6 +43,25 @@ export const REQUIRED_FIELD_OPTIONS: { key: string; label: string }[] = [
   { key: 'beneficiaries', label: 'At least one beneficiary' },
 ]
 
+/** Package fields a package-workflow stage can require. */
+export const PACKAGE_FIELD_OPTIONS: { key: string; label: string }[] = [
+  { key: 'description', label: 'Specifications / description' },
+  { key: 'abc_amount', label: 'ABC (approved budget)' },
+  { key: 'procurement_mode_id', label: 'Procurement mode' },
+  { key: 'expense_class_id', label: 'Expense class' },
+  { key: 'uacs_code_id', label: 'UACS code' },
+  { key: 'supplier_id', label: 'Supplier' },
+  { key: 'contract_amount', label: 'Contract amount' },
+  { key: 'award_date', label: 'Award date' },
+  { key: 'contract_no', label: 'PO / contract No.' },
+  { key: 'responsible_user_id', label: 'Responsible person' },
+  { key: 'due_date', label: 'Target completion date' },
+]
+
 export const FIELD_LABEL = Object.fromEntries(
   REQUIRED_FIELD_OPTIONS.map((f) => [f.key, f.label]),
+) as Record<string, string>
+
+export const PACKAGE_FIELD_LABEL = Object.fromEntries(
+  PACKAGE_FIELD_OPTIONS.map((f) => [f.key, f.label]),
 ) as Record<string, string>

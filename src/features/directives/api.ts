@@ -55,7 +55,10 @@ export function useMyPendingDirectives() {
   })
 }
 
-export function useEntityDirectives(entityType: 'activity' | 'beneficiary', entityId: string) {
+export function useEntityDirectives(
+  entityType: 'activity' | 'package' | 'beneficiary',
+  entityId: string,
+) {
   return useQuery({
     queryKey: [...directivesKey, 'entity', entityType, entityId],
     queryFn: async () => {
@@ -131,7 +134,7 @@ export interface IssueDirectiveInput {
   recipients: string[]
   responseDue: string | null
   priority: DirectivePriority
-  entityType?: 'activity' | 'beneficiary' | null
+  entityType?: 'activity' | 'package' | 'beneficiary' | null
   entityId?: string | null
 }
 

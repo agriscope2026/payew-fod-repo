@@ -44,7 +44,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/auth-context'
 import { canManageProgram, canWriteProgram } from '@/features/auth/permissions'
 import { useBeneficiaries } from '@/features/beneficiaries/api'
+import { useEntityApprovals } from '@/features/approvals/api'
+import { ApprovalList } from '@/features/approvals/components/ApprovalList'
+import { RequestDialog } from '@/features/approvals/components/RequestDialog'
+import { RequestMenu } from '@/features/approvals/components/RequestMenu'
+import { useApprovalRouting } from '@/features/approvals/use-routing'
 import { OverdueNoticeDialog } from '@/features/directives/components/OverdueNoticeDialog'
+import { useActivityIssues } from '@/features/monitoring/api'
+import { IssuesTab } from '@/features/monitoring/components/IssuesTab'
+import { ProgressTab } from '@/features/monitoring/components/ProgressTab'
+import { ActivityFinancePanel } from '@/features/finance/components/ActivityFinancePanel'
+import { PackagesTab } from '@/features/packages/components/PackagesTab'
+import { FIELD_LABEL } from '@/features/workflows/constants'
 import { useCommentCount } from '@/features/discussion/api'
 import { AttachmentsPanel } from '@/features/files/components/AttachmentsPanel'
 import { useLocationLookup } from '@/features/locations/api'
@@ -70,6 +81,7 @@ import { ActivityStatusBadge } from '../components/ActivityStatusBadge'
 import { BeneficiaryLinksEditor } from '../components/BeneficiaryLinksEditor'
 import { DiscussionTab } from '../components/DiscussionTab'
 import { HistoryPanel, TransitionLog } from '../components/HistoryPanel'
+import { recordMissingFields } from '../stage-utils'
 import { TasksPanel } from '../components/TasksPanel'
 import { WorkflowStepper } from '../components/WorkflowStepper'
 import { useActivityLookups } from '../use-activity-lookups'
@@ -77,6 +89,10 @@ import { useActivityLookups } from '../use-activity-lookups'
 const TABS = [
   'overview',
   'workflow',
+  'packages',
+  'finance',
+  'progress',
+  'issues',
   'checklist',
   'beneficiaries',
   'attachments',
@@ -100,6 +116,9 @@ export default function ActivityDetailPage() {
   const { data: links = [] } = useActivityBeneficiaries(id)
   const history = useActivityHistory(id, tab === 'history')
   const { data: commentCount = 0 } = useCommentCount('activity', id ?? '')
+  const { data: issues = [] } = useActivityIssues(id)
+  const [skipStage, setSkipStage] = useState<{ id: string; name: string } | null>(null)
+  const openIssues = issues.filter((i) => i.status === 'open' || i.status === 'mitigating').length
 
   const { profile, programs } = useAuth()
   const lookups = useActivityLookups()
@@ -229,6 +248,24 @@ export default function ActivityDetailPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="workflow">Workflow</TabsTrigger>
+            <TabsTrigger value="packages">
+              Packages{' '}
+              {activity.packages_total > 0 && (
+                <Badge variant="secondary" className="px-1.5 py-0">
+                  {activity.packages_closed}/{activity.packages_total}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="finance">Finance</TabsTrigger>
+            <TabsTrigger value="progress">Progress</TabsTrigger>
+            <TabsTrigger value="issues">
+              Issues{' '}
+              {openIssues > 0 && (
+                <Badge variant="secondary" className="px-1.5 py-0">
+                  {openIssues}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="checklist">
               Checklist{' '}
               {openChecklist > 0 && (
@@ -252,19 +289,37 @@ export default function ActivityDetailPage() {
         </div>
 
         <TabsContent value="overview" className="mt-4">
-          <Overview activity={activity} lookups={lookups} location={location.format(activity)} />
+          <Overview
+            activity={activity}
+            lookups={lookups}
+            location={location.format(activity)}
+            openIssues={openIssues}
+            onOpenTab={setTab}
+          />
         </TabsContent>
 
         <TabsContent value="workflow" className="mt-4">
           <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
             <WorkflowStepper
-              activity={activity}
               stages={stages}
               tasks={tasks}
+              active={activity.status !== 'cancelled' && !activity.deleted_at}
               canEdit={canEdit}
               canManage={canManage}
               members={members}
               personName={lookups.name.person}
+              missingFields={(fields) =>
+                recordMissingFields(activity as unknown as Record<string, unknown>, fields, {
+                  beneficiariesCount: activity.beneficiaries_count,
+                })
+              }
+              fieldLabels={FIELD_LABEL}
+              editHint="Edit activity"
+              openPackages={activity.packages_total - activity.packages_closed}
+              packagesSlot={
+                <PackagesSummary activity={activity} onOpen={() => setTab('packages')} />
+              }
+              onRequestSkip={canEdit ? (s) => setSkipStage({ id: s.id, name: s.name }) : undefined}
             />
             <Card className="h-fit">
               <CardHeader>
@@ -275,6 +330,37 @@ export default function ActivityDetailPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="progress" className="mt-4">
+          <ProgressTab
+            activity={activity}
+            canEdit={canEdit && activity.status !== 'cancelled'}
+            canManage={canManage}
+            personName={lookups.name.person}
+          />
+        </TabsContent>
+
+        <TabsContent value="issues" className="mt-4">
+          <IssuesTab
+            activityId={activity.id}
+            canWrite={canEdit}
+            members={members}
+            personName={lookups.name.person}
+          />
+        </TabsContent>
+
+        <TabsContent value="finance" className="mt-4">
+          <ActivityFinancePanel activity={activity} canEdit={canEdit} canManage={canManage} />
+        </TabsContent>
+
+        <TabsContent value="packages" className="mt-4">
+          <PackagesTab
+            activity={activity}
+            canEdit={canEdit}
+            canManage={canManage}
+            members={members}
+          />
         </TabsContent>
 
         <TabsContent value="checklist" className="mt-4">
@@ -336,6 +422,63 @@ export default function ActivityDetailPage() {
           />
         </TabsContent>
       </Tabs>
+      {skipStage && (
+        <RequestDialog
+          type="stage_skip"
+          target={{
+            entityType: 'activity',
+            entityId: activity.id,
+            programId: activity.program_id,
+            fiscalYearId: activity.fiscal_year_id,
+            label: `${activity.code} · ${activity.title}`,
+            stageId: skipStage.id,
+            stageName: skipStage.name,
+          }}
+          onClose={() => setSkipStage(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Shown inside the "Procurement & Implementation" stage. */
+function PackagesSummary({ activity: a, onOpen }: { activity: ActivityView; onOpen: () => void }) {
+  const pct = a.packages_total ? Math.round((a.packages_closed / a.packages_total) * 100) : 0
+  return (
+    <div className="space-y-2 text-sm">
+      <p>
+        {a.packages_total === 0 ? (
+          'No supplier packages yet. Add one per supplier or lot in the Packages tab.'
+        ) : (
+          <>
+            <strong>
+              {a.packages_closed} of {a.packages_total}
+            </strong>{' '}
+            packages closed
+            {a.packages_overdue > 0 && (
+              <span className="text-destructive"> · {a.packages_overdue} delayed</span>
+            )}
+            {a.packages_cancelled > 0 && (
+              <span className="text-muted-foreground"> · {a.packages_cancelled} cancelled</span>
+            )}
+          </>
+        )}
+      </p>
+      {a.packages_total > 0 && (
+        <div
+          className="bg-primary/15 h-2 overflow-hidden rounded-full"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Packages closed"
+        >
+          <div className="bg-primary h-full rounded-full" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <Button size="sm" variant="outline" onClick={onOpen}>
+        Open packages
+      </Button>
     </div>
   )
 }
@@ -375,11 +518,16 @@ function Overview({
   activity: a,
   lookups,
   location,
+  openIssues,
+  onOpenTab,
 }: {
   activity: ActivityView
   lookups: ReturnType<typeof useActivityLookups>
   location: string
+  openIssues: number
+  onOpenTab: (tab: string) => void
 }) {
+  const { data: requests = [] } = useEntityApprovals(a.id)
   const rows: [string, ReactNode][] = [
     ['Target output', a.target_output],
     [
@@ -436,40 +584,39 @@ function Overview({
         </CardContent>
       </Card>
       <div className="space-y-4">
-        <Upcoming icon={WalletIcon} title="Financial tracker" phase={7}>
-          Allotment → obligation (ORS) → disbursement (DV) → balance and savings for this activity.
-        </Upcoming>
-        <Upcoming icon={TrendingUpIcon} title="Progress & issues" phase={8}>
-          Physical and financial accomplishment updates, issues and risks.
-        </Upcoming>
+        <Card className="gap-2 py-4">
+          <CardContent className="space-y-2 px-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <TrendingUpIcon className="text-primary size-4" /> Monitoring
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => onOpenTab('progress')}>
+                Progress updates
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onOpenTab('issues')}>
+                {openIssues} open issue{openIssues === 1 ? '' : 's'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onOpenTab('finance')}>
+                <WalletIcon /> Finance
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="gap-2 py-4">
+          <CardContent className="space-y-1 px-4">
+            <p className="text-sm font-medium">Requests</p>
+            {requests.length ? (
+              <ApprovalList requests={requests.slice(0, 5)} dense />
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                No approval requests. Extensions, cancellations and workflow changes are requested
+                from the header.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
-  )
-}
-
-function Upcoming({
-  icon: Icon,
-  title,
-  phase,
-  children,
-}: {
-  icon: typeof WalletIcon
-  title: string
-  phase: number
-  children: ReactNode
-}) {
-  return (
-    <Card className="bg-muted/30 gap-2 border-dashed py-4">
-      <CardContent className="space-y-1 px-4">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <Icon className="text-primary size-4" /> {title}
-          <Badge variant="secondary" className="ml-auto">
-            Phase {phase}
-          </Badge>
-        </p>
-        <p className="text-muted-foreground text-xs">{children}</p>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -564,6 +711,13 @@ function HeaderActions({
   const navigate = useNavigate()
   const cancel = useCancelActivity()
   const trash = useTrashActivities()
+  const routing = useApprovalRouting()
+  const open =
+    !activity.deleted_at && activity.status !== 'cancelled' && activity.status !== 'completed'
+  const requestTypes =
+    canEdit && open && routing.mustRequest(canManage)
+      ? (['extension', 'cancellation', 'workflow_change'] as const).slice()
+      : []
   const [confirm, setConfirm] = useState<ConfirmOptions | null>(null)
   const [reasonFor, setReasonFor] = useState(false)
   const [switching, setSwitching] = useState(false)
@@ -590,6 +744,17 @@ function HeaderActions({
           <PencilIcon /> Edit
         </Button>
       )}
+      <RequestMenu
+        types={[...requestTypes]}
+        target={{
+          entityType: 'activity',
+          entityId: activity.id,
+          programId: activity.program_id,
+          fiscalYearId: activity.fiscal_year_id,
+          label: `${activity.code} · ${activity.title}`,
+          currentDueDate: activity.due_date,
+        }}
+      />
       {canManage && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -598,7 +763,7 @@ function HeaderActions({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {!activity.deleted_at && !cancelled && (
+            {!activity.deleted_at && !cancelled && !routing.adminNeedsSuperadmin && (
               <DropdownMenuItem onSelect={() => setSwitching(true)}>
                 <GitBranchIcon /> Change workflow
               </DropdownMenuItem>
@@ -622,7 +787,11 @@ function HeaderActions({
                   <ArchiveRestoreIcon /> Restore activity
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem variant="destructive" onSelect={() => setReasonFor(true)}>
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={routing.adminNeedsSuperadmin}
+                  onSelect={() => setReasonFor(true)}
+                >
                   <BanIcon /> Cancel activity
                 </DropdownMenuItem>
               ))}
@@ -673,8 +842,8 @@ function CancelDialog({ activityId, onClose }: { activityId: string; onClose: ()
         <DialogHeader>
           <DialogTitle>Cancel activity</DialogTitle>
           <DialogDescription>
-            The activity stays on record (and in reports) as cancelled. From Phase 8, cancellations
-            go through the approval workflow.
+            The activity stays on record (and in reports) as cancelled. Staff ask for this through
+            Request → Cancellation.
           </DialogDescription>
         </DialogHeader>
         <FormField id="cancel-reason" label="Reason *">

@@ -14,6 +14,7 @@ import {
   ScrollTextIcon,
   SettingsIcon,
   SproutIcon,
+  StoreIcon,
   Trash2Icon,
   UsersIcon,
   type LucideIcon,
@@ -104,6 +105,14 @@ export const NAV: NavSection[] = [
         phase: 4,
         description: "Farmers' associations, cooperatives and individual farmers served.",
         keywords: 'fa coop farmers associations',
+      },
+      {
+        label: 'Suppliers',
+        to: '/suppliers',
+        icon: StoreIcon,
+        phase: 6,
+        description: 'Shared supplier list: PhilGEPS/permits, packages awarded, performance.',
+        keywords: 'vendor contractor philgeps tin blacklist',
       },
       {
         label: 'Calendar',

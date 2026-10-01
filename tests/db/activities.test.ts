@@ -8,7 +8,10 @@ beforeAll(async () => {
 })
 
 const FY2026 = '20000000-0000-4000-8000-000000002026'
-const DEFAULT_TEMPLATE = '40000000-0000-4000-8000-000000000001'
+/** The original 11-stage flow; these engine tests run on it. */
+const CLASSIC_TEMPLATE = '40000000-0000-4000-8000-000000000001'
+/** The DA-wide default since Addendum B (activity track with a packages stage). */
+const DEFAULT_TEMPLATE = '40000000-0000-4000-8000-000000000002'
 
 /** Creates an AMIA activity as the AMIA admin and returns its id. */
 async function newActivity(
@@ -22,8 +25,11 @@ async function newActivity(
     fiscal_year_id: FY2026,
     title: 'Test activity',
     start_date: '2026-03-02',
+    workflow_template_id: CLASSIC_TEMPLATE,
     ...extra,
   }
+  // workflow_template_id: null → let the program/DA-wide default apply.
+  if (cols.workflow_template_id === null) delete (cols as Record<string, unknown>).workflow_template_id
   const keys = Object.keys(cols)
   const [row] = await s.q<{ id: string; code: string }>(
     `insert into public.activities (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')}) returning id, code`,
@@ -67,7 +73,7 @@ const topStage = async (s: Session, activityId: string, n: number) =>
   (await stages(s, activityId)).filter((x) => !x.parent_id)[n - 1]
 
 describe('activity creation', () => {
-  it('assigns a program/year code and instantiates the default workflow with planned dates', async () => {
+  it('assigns a program/year code and instantiates the chosen workflow with planned dates', async () => {
     await inTx(db, async (s) => {
       const a = await newActivity(s)
       expect(a.code).toMatch(/^AMIA-2026-\d{4}$/)
@@ -175,7 +181,7 @@ describe('stage actions', () => {
       const a = await newActivity(s)
       const third = await topStage(s, a.id, 3)
       const first = await topStage(s, a.id, 1)
-      await expect(act(s, third.id, 'complete')).rejects.toThrow(/earlier stages first/)
+      await expect(act(s, third.id, 'complete')).rejects.toThrow(/Finish "Activity Design \/ Proposal" first/)
       await expect(act(s, first.id, 'start', null, '2099-01-01')).rejects.toThrow(/future/)
 
       await s.as(USERS.amiaStaff1) // read-only staff
@@ -340,7 +346,7 @@ describe('workflow templates', () => {
       )
       expect(is_default).toBe(true)
 
-      const fresh = await newActivity(s)
+      const fresh = await newActivity(s, { workflow_template_id: null })
       expect((await stages(s, fresh.id)).map((r) => r.name)).toEqual([
         'Activity Design / Proposal',
         'Conduct Training',
@@ -379,7 +385,7 @@ describe('workflow templates', () => {
       ).rejects.toThrow(/cannot manage/)
       await expect(
         s.q(`select public.save_workflow_template($1, 'X', null, '[{"name":"a"}]'::jsonb)`, [
-          DEFAULT_TEMPLATE,
+          CLASSIC_TEMPLATE,
         ]),
       ).rejects.toThrow(/cannot manage/)
       await s.as(USERS.superadmin)

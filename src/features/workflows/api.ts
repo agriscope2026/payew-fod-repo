@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import type { AppRole, Json, PhaseKey, WorkflowStageRow } from '@/types/database'
+import type { AppRole, Json, PhaseKey, WorkflowScope, WorkflowStageRow } from '@/types/database'
 
 export const workflowsKey = ['workflows'] as const
 
@@ -20,13 +20,13 @@ export function useWorkflowTemplates() {
   })
 }
 
-/** Templates usable by a program's activities: its own active ones plus DA-wide ones. */
-export function templatesForProgram<T extends { program_id: string | null; is_active: boolean }>(
-  templates: T[],
-  programId: string,
-) {
+/** Templates usable in a program (its own active ones plus DA-wide ones) for one level. */
+export function templatesForProgram<
+  T extends { program_id: string | null; is_active: boolean; scope: WorkflowScope },
+>(templates: T[], programId: string, scope: WorkflowScope = 'activity') {
   return templates.filter(
-    (t) => t.is_active && (t.program_id === null || t.program_id === programId),
+    (t) =>
+      t.is_active && t.scope === scope && (t.program_id === null || t.program_id === programId),
   )
 }
 
@@ -57,6 +57,8 @@ export interface StageDraft {
   required_documents: string[]
   required_fields: string[]
   skippable: boolean
+  /** Activity workflows only: the stage that holds the procurement packages. */
+  tracks_packages: boolean
   substeps: StageDraft[]
 }
 
@@ -71,6 +73,7 @@ export function toDrafts(rows: WorkflowStageRow[]): StageDraft[] {
     required_documents: r.required_documents,
     required_fields: r.required_fields,
     skippable: r.skippable,
+    tracks_packages: r.tracks_packages,
     substeps: rows
       .filter((c) => c.parent_id === r.id)
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -92,6 +95,7 @@ function toPayload(drafts: StageDraft[]): Json {
     required_documents: d.required_documents,
     required_fields: d.required_fields,
     skippable: d.skippable,
+    tracks_packages: d.tracks_packages,
     substeps: d.substeps.map(strip),
   })
   return drafts.map(strip)
@@ -109,11 +113,13 @@ export function useCreateTemplate() {
       programId: string | null
       name: string
       copyFrom?: string | null
+      scope?: WorkflowScope
     }) => {
       const { data, error } = await supabase.rpc('create_workflow_template', {
         p_program_id: input.programId,
         p_name: input.name,
         p_copy_from: input.copyFrom ?? null,
+        p_scope: input.scope ?? 'activity',
       })
       if (error) throw error
       return data

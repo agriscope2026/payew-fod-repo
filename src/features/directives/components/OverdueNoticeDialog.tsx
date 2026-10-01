@@ -15,6 +15,7 @@ import { SelectNative } from '@/components/ui/select-native'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/auth-context'
+import { usePackageOverdueDraft, useSendPackageOverdueNotice } from '@/features/packages/api'
 import { todayManila } from '@/lib/format'
 import { errorMessage } from '@/lib/supabase'
 import type { DirectivePriority, OverdueNoticeDraft } from '@/types/database'
@@ -26,15 +27,20 @@ import { RecipientPicker } from './RecipientPicker'
 /**
  * "Send Overdue Notice": a directive prefilled from Settings → overdue notice
  * template, addressed to the stage assignee / responsible person by default.
+ * Works for an activity or for one procurement package (`kind="package"`).
  */
 export function OverdueNoticeDialog({
   activity,
+  kind = 'activity',
   onClose,
 }: {
   activity: { id: string; code: string | null; title: string; program_id: string }
+  kind?: 'activity' | 'package'
   onClose: () => void
 }) {
-  const draft = useOverdueDraft(activity.id, true)
+  const activityDraft = useOverdueDraft(activity.id, kind === 'activity')
+  const packageDraft = usePackageOverdueDraft(activity.id, kind === 'package')
+  const draft = kind === 'package' ? packageDraft : activityDraft
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -60,7 +66,7 @@ export function OverdueNoticeDialog({
             </div>
           </div>
         ) : draft.data ? (
-          <NoticeForm activity={activity} draft={draft.data} onClose={onClose} />
+          <NoticeForm activity={activity} kind={kind} draft={draft.data} onClose={onClose} />
         ) : (
           <div className="space-y-3">
             <Skeleton className="h-9" />
@@ -75,16 +81,20 @@ export function OverdueNoticeDialog({
 
 function NoticeForm({
   activity,
+  kind,
   draft,
   onClose,
 }: {
   activity: { id: string; program_id: string }
+  kind: 'activity' | 'package'
   draft: OverdueNoticeDraft
   onClose: () => void
 }) {
   const { user } = useAuth()
   const { membersOf } = useProgramMembers()
-  const send = useSendOverdueNotice()
+  const sendActivity = useSendOverdueNotice()
+  const sendPackage = useSendPackageOverdueNotice()
+  const send = kind === 'package' ? sendPackage : sendActivity
   const [title, setTitle] = useState(draft.title)
   const [body, setBody] = useState(draft.body)
   const [due, setDue] = useState(draft.response_due)
@@ -96,14 +106,9 @@ function NoticeForm({
 
   const submit = async () => {
     try {
-      await send.mutateAsync({
-        activityId: activity.id,
-        recipients,
-        title,
-        body,
-        responseDue: due || null,
-        priority,
-      })
+      const common = { recipients, title, body, responseDue: due || null, priority }
+      if (kind === 'package') await sendPackage.mutateAsync({ packageId: activity.id, ...common })
+      else await sendActivity.mutateAsync({ activityId: activity.id, ...common })
       toast.success('Overdue notice sent')
       onClose()
     } catch (err) {
@@ -162,7 +167,7 @@ function NoticeForm({
           <span className="text-sm font-medium">Recipients *</span>
           {draft.recipients.length === 0 && (
             <p className="text-muted-foreground text-xs">
-              No responsible person is set on this activity. Choose who should respond.
+              No responsible person is set. Choose who should respond.
             </p>
           )}
           <RecipientPicker people={people} value={recipients} onChange={setRecipients} />

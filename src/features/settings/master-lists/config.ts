@@ -15,6 +15,8 @@ export type MasterListKey =
   | 'activity_categories'
   | 'beneficiary_types'
   | 'document_types'
+  | 'procurement_categories'
+  | 'procurement_modes'
 
 export interface FieldDef {
   key: string
@@ -32,7 +34,7 @@ export interface MasterListDef {
   key: MasterListKey
   label: string
   singular: string
-  group: 'Locations' | 'Finance' | 'Programs & Beneficiaries' | 'Documents'
+  group: 'Locations' | 'Finance' | 'Procurement' | 'Programs & Beneficiaries' | 'Documents'
   description: string
   fields: FieldDef[]
   /** Column used as the option label when this list feeds a select. */
@@ -222,6 +224,51 @@ export const MASTER_LISTS: MasterListDef[] = [
     fields: [code('e.g. IAR'), name(), sortOrder],
     labelKey: 'name',
     orderBy: [{ column: 'sort_order' }, { column: 'code' }],
+  },
+  {
+    key: 'procurement_categories',
+    label: 'Procurement Categories',
+    singular: 'procurement category',
+    group: 'Procurement',
+    description:
+      'Package categories (lodging, meals, transport…). The defaults pre-fill new packages.',
+    fields: [
+      code('e.g. MEALS'),
+      name(),
+      { key: 'description', label: 'Description', type: 'textarea', hideInTable: true },
+      {
+        key: 'default_expense_class_id',
+        label: 'Default expense class',
+        type: 'select',
+        optionsFrom: 'expense_classes',
+      },
+      {
+        key: 'default_uacs_code_id',
+        label: 'Default UACS code',
+        type: 'select',
+        optionsFrom: 'uacs_codes',
+        hideInTable: true,
+      },
+      sortOrder,
+    ],
+    labelKey: 'name',
+    orderBy: [{ column: 'sort_order' }, { column: 'name' }],
+  },
+  {
+    key: 'procurement_modes',
+    label: 'Procurement Modes',
+    singular: 'procurement mode',
+    group: 'Procurement',
+    description:
+      'Modes of procurement under RA 12009 / RA 9184 (SVP, bidding, direct contracting…).',
+    fields: [
+      code('e.g. SVP'),
+      name(),
+      { key: 'description', label: 'Description', type: 'textarea', hideInTable: true },
+      sortOrder,
+    ],
+    labelKey: 'name',
+    orderBy: [{ column: 'sort_order' }, { column: 'name' }],
   },
 ]
 

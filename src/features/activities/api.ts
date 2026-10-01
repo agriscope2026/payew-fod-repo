@@ -62,6 +62,7 @@ export function useActivityStages(id: string | undefined) {
         .from('activity_stage_progress')
         .select('*')
         .eq('activity_id', id!)
+        .is('package_id', null)
         .order('sort_order')
       if (error) throw error
       return data
@@ -78,6 +79,7 @@ export function useTransitions(id: string | undefined) {
         .from('activity_stage_transitions')
         .select('*')
         .eq('activity_id', id!)
+        .is('package_id', null)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data
@@ -94,6 +96,7 @@ export function useTasks(id: string | undefined) {
         .from('activity_tasks')
         .select('*')
         .eq('activity_id', id!)
+        .is('package_id', null)
         .order('sort_order')
         .order('created_at')
       if (error) throw error
@@ -164,7 +167,11 @@ export function useBeneficiaryAssistance(beneficiaryId: string | undefined) {
 // ---------------------------------------------------------------------------
 function useInvalidate() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: activitiesKey })
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: activitiesKey }),
+      queryClient.invalidateQueries({ queryKey: ['packages'] }),
+    ])
 }
 
 export type ActivityInput = Omit<
@@ -363,7 +370,8 @@ export function useTrashActivities() {
   })
 }
 
-export function useTaskMutations(activityId: string) {
+/** Checklist of an activity's own track, or of one package when `packageId` is given. */
+export function useTaskMutations(activityId: string, packageId: string | null = null) {
   const invalidate = useInvalidate()
   const add = useMutation({
     mutationFn: async (
@@ -374,7 +382,7 @@ export function useTaskMutations(activityId: string) {
     ) => {
       const { error } = await supabase
         .from('activity_tasks')
-        .insert({ ...t, activity_id: activityId })
+        .insert({ ...t, activity_id: activityId, package_id: packageId })
       if (error) throw error
     },
     onSuccess: invalidate,

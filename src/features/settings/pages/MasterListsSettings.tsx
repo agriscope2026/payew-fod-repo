@@ -3,7 +3,13 @@ import { cn } from '@/lib/utils'
 import { MASTER_LISTS, MASTER_LIST_BY_KEY, type MasterListKey } from '../master-lists/config'
 import { MasterListEditor } from '../master-lists/MasterListEditor'
 
-const GROUPS = ['Locations', 'Finance', 'Programs & Beneficiaries', 'Documents'] as const
+const GROUPS = [
+  'Locations',
+  'Finance',
+  'Procurement',
+  'Programs & Beneficiaries',
+  'Documents',
+] as const
 
 export default function MasterListsSettings() {
   const { '*': rest } = useParams()

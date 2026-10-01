@@ -26,7 +26,7 @@ import { useProgramMembers } from '../use-program-members'
 import { RecipientPicker } from './RecipientPicker'
 
 export interface LinkedRecord {
-  type: 'activity' | 'beneficiary'
+  type: 'activity' | 'package' | 'beneficiary'
   id: string
   programId: string
   label: string
