@@ -257,4 +257,13 @@ The full step-by-step guide is in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. 
 5. Add the first user in Supabase Auth; on an empty system it becomes the superadmin. Then import locations from the PSA PSGC file (Settings → Master Lists → Locations), create the fiscal year and add users.
 6. Run `supabase/checks/post_deploy.sql` in the SQL editor; every row should be `ok`.
 
-CI (`.github/workflows/ci.yml`) runs typecheck, lint, all unit and database tests, and a production build on every push and pull request.
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, all unit and database tests, and a production build on every push to `dev` or `prod` and on every pull request.
+
+## Branches
+
+There are two long-lived branches and no `main`:
+
+- **`dev`**: the default branch, for daily work. It deploys to a Vercel preview backed by the dev Supabase project.
+- **`prod`**: the live system. It changes only through a pull request from `dev`, and deploys to Vercel production.
+
+The release flow and one-time GitHub, Vercel and Supabase settings are in [docs/DEPLOYMENT.md § Branches](docs/DEPLOYMENT.md#branches).

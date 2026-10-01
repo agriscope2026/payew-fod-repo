@@ -133,9 +133,38 @@ Then run a 10-minute smoke test with a program admin and a staff account:
 
 ## 8. Updating
 
-- Every push and pull request runs CI (`.github/workflows/ci.yml`): typecheck, lint, all tests (including the database tests on in-memory Postgres) and a production build.
-- Vercel deploys `main` automatically.
-- **New migrations:** run `npx supabase db push` after merging. Never edit a migration that has already been applied; add a new one.
+### Branches
+
+The repository has two long-lived branches and no `main`:
+
+| Branch | Purpose | Deploys to |
+| --- | --- | --- |
+| `dev` | Day-to-day work and testing. The default branch on GitHub. | Vercel **Preview** (its own link), using the **dev** Supabase project |
+| `prod` | What users run. Changes arrive only by pull request from `dev`. | Vercel **Production**, using the **production** Supabase project |
+
+The flow:
+
+1. Work on `dev`, or on a short-lived feature branch that is merged into `dev` by pull request.
+2. Test on the `dev` preview link.
+3. To release, open a pull request from `dev` to `prod`. Merge it when CI passes.
+4. If the release has new migrations, run `npx supabase db push` against the production project (see below), then check the live site.
+5. An urgent fix goes to `prod` by pull request too. Merge `prod` back into `dev` afterwards so the branches don't drift.
+
+One-time setup:
+
+- **GitHub → Settings → General → Default branch:** `dev`.
+- **GitHub → Settings → Branches → Add rule** for `prod`: require a pull request and the `CI / check` status, and block force pushes and deletion. A lighter rule on `dev` (block force pushes and deletion) is enough.
+- **Vercel → Settings → Git → Production Branch:** `prod`. Pushes to `dev` then build preview deployments.
+- **Vercel → Settings → Environment Variables:** set the production Supabase URL and anon key for **Production**, and the dev Supabase project's values for **Preview**. Otherwise testing on `dev` writes into the real data.
+- **Two Supabase projects** (for example `payew-prod` and `payew-dev`), each set up as in steps 1–4. The dev project may load the demo seed (`supabase db push --include-seed`); production never does. Add the dev preview address to the dev project's redirect URLs and R2 CORS rule, or use a separate dev bucket.
+
+To switch the Supabase CLI between them, link before you push: `npx supabase link --project-ref <dev-ref>` or `<prod-ref>`.
+
+### Routine updates
+
+- CI (`.github/workflows/ci.yml`) runs on every push to `dev` or `prod` and on every pull request: typecheck, lint, all tests (including the database tests on in-memory Postgres) and a production build.
+- Vercel deploys `prod` to production and `dev` to preview automatically.
+- **New migrations:** run `npx supabase db push` on the dev project when merged into `dev`, and on the production project when merged into `prod`. Never edit a migration that has already been applied; add a new one.
 - **Changed Edge Functions:** run `npx supabase functions deploy admin-users files`.
 - **Maintenance:** Settings → System → Maintenance banner shows a notice to all users.
 
