@@ -91,6 +91,51 @@ describe('migrations', () => {
     expect(staff.rows).toEqual([{ role: 'program_staff' }])
   })
 
+  it('create users the way Supabase Auth does (insert first, app_metadata set later)', async () => {
+    const db = await createDb()
+    const authCreate = async (email: string, appMeta: object) => {
+      await db.exec('begin')
+      try {
+        const { rows } = await db.query<{ id: string }>(
+          `insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+           values (gen_random_uuid(), 'authenticated', 'authenticated', $1,
+                   '{"provider":"email","providers":["email"]}', '{"full_name":"New Person"}', now(), now())
+           returning id`,
+          [email],
+        )
+        await db.query(
+          `update auth.users set raw_app_meta_data = raw_app_meta_data || $2::jsonb where id = $1`,
+          [rows[0].id, JSON.stringify(appMeta)],
+        )
+        await db.exec('commit')
+      } catch (err) {
+        await db.exec('rollback')
+        throw err
+      }
+    }
+    const profile = async (email: string) =>
+      (
+        await db.query<{ role: string; full_name: string; program: string | null }>(
+          `select p.role::text, p.full_name, g.code as program
+           from public.profiles p left join public.programs g on g.id = p.program_id
+           where p.email = $1`,
+          [email],
+        )
+      ).rows
+
+    await authCreate('new.staff@da.gov.ph', { app_role: 'program_staff', program_code: 'rice' })
+    expect(await profile('new.staff@da.gov.ph')).toEqual([
+      { role: 'program_staff', full_name: 'New Person', program: 'RICE' },
+    ])
+    await authCreate('new.chief@da.gov.ph', { app_role: 'superadmin' })
+    expect(await profile('new.chief@da.gov.ph')).toEqual([
+      { role: 'superadmin', full_name: 'New Person', program: null },
+    ])
+    // Still refused at commit when no program ever arrives.
+    await expect(authCreate('nobody@da.gov.ph', {})).rejects.toThrow(/New accounts need a program/)
+    expect(await profile('nobody@da.gov.ph')).toEqual([])
+  })
+
   it('ship a post-deploy checklist that reports what is still missing', async () => {
     const root = resolve(import.meta.dirname, '../..')
     const db = await createDb({ seed: false })
