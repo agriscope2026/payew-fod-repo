@@ -57,7 +57,6 @@ import { RequestDialog } from '@/features/approvals/components/RequestDialog'
 import { RequestMenu } from '@/features/approvals/components/RequestMenu'
 import { useApprovalRouting } from '@/features/approvals/use-routing'
 import { useEntityDirectives } from '@/features/directives/api'
-import { PackageFinancePanel } from '@/features/finance/components/PackageFinancePanel'
 import { DirectiveList } from '@/features/directives/components/DirectiveList'
 import { IssueDirectiveDialog } from '@/features/directives/components/IssueDirectiveDialog'
 import { OverdueNoticeDialog } from '@/features/directives/components/OverdueNoticeDialog'
@@ -311,7 +310,6 @@ export default function PackageDetailPage() {
         <div className="overflow-x-auto">
           <TabsList>
             <TabsTrigger value="workflow">Workflow</TabsTrigger>
-            <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="checklist">
               Checklist{' '}
               {tasks.filter((t) => !t.is_done).length > 0 && (
@@ -359,10 +357,6 @@ export default function PackageDetailPage() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="finance" className="mt-4">
-          <PackageFinancePanel pkg={pkg} canEdit={canEdit} canManage={canManage} />
         </TabsContent>
 
         <TabsContent value="checklist" className="mt-4">

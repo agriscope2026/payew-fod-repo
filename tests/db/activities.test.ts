@@ -29,7 +29,8 @@ async function newActivity(
     ...extra,
   }
   // workflow_template_id: null → let the program/DA-wide default apply.
-  if (cols.workflow_template_id === null) delete (cols as Record<string, unknown>).workflow_template_id
+  if (cols.workflow_template_id === null)
+    delete (cols as Record<string, unknown>).workflow_template_id
   const keys = Object.keys(cols)
   const [row] = await s.q<{ id: string; code: string }>(
     `insert into public.activities (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')}) returning id, code`,
@@ -138,22 +139,12 @@ describe('activity creation', () => {
 })
 
 describe('stage actions', () => {
-  it('enforces required fields and checklist items, then advances', async () => {
+  it('completes a stage even with empty fields and open checklist items, then advances', async () => {
     await inTx(db, async (s) => {
       const a = await newActivity(s)
       const design = await topStage(s, a.id, 1)
 
-      await expect(act(s, design.id, 'complete')).rejects.toThrow(
-        /Fill in these activity fields first: description, objectives, target_output, budget_amount/,
-      )
-      await s.q(
-        `update public.activities set description = 'd', objectives = 'o', target_output = 't', budget_amount = 1000 where id = $1`,
-        [a.id],
-      )
-      await expect(act(s, design.id, 'complete')).rejects.toThrow(/1 required checklist item/)
-      await s.q(`update public.activity_tasks set is_done = true where stage_progress_id = $1`, [
-        design.id,
-      ])
+      // Required fields and checklist items are warnings in the app, not blocks.
       await act(s, design.id, 'complete', null, '2026-03-05')
 
       const [v] = await s.q<{ status: string; current_stage_name: string; stages_done: number }>(
@@ -181,7 +172,9 @@ describe('stage actions', () => {
       const a = await newActivity(s)
       const third = await topStage(s, a.id, 3)
       const first = await topStage(s, a.id, 1)
-      await expect(act(s, third.id, 'complete')).rejects.toThrow(/Finish "Activity Design \/ Proposal" first/)
+      await expect(act(s, third.id, 'complete')).rejects.toThrow(
+        /Finish "Activity Design \/ Proposal" first/,
+      )
       await expect(act(s, first.id, 'start', null, '2099-01-01')).rejects.toThrow(/future/)
 
       await s.as(USERS.amiaStaff1) // read-only staff

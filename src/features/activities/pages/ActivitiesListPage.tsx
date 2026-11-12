@@ -1,41 +1,47 @@
-import type { ColumnDef } from '@tanstack/react-table'
 import {
-  CalendarDaysIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   DownloadIcon,
-  KanbanSquareIcon,
+  FileSpreadsheetIcon,
   ListChecksIcon,
   ListIcon,
   PlusIcon,
-  Trash2Icon,
+  SearchIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { BarList } from '@/components/charts/BarList'
+import { FlowChart } from '@/components/charts/FlowChart'
 import { ProgramChip } from '@/components/common/Badges'
-import { ConfirmDialog, type ConfirmOptions } from '@/components/common/ConfirmDialog'
-import { DataTable } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { SelectNative } from '@/components/ui/select-native'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/auth-context'
-import { canManageProgram, canWriteProgram } from '@/features/auth/permissions'
-import { useLocationLookup } from '@/features/locations/api'
-import { PHASE_LABEL, PHASES } from '@/features/workflows/constants'
+import { canWriteProgram } from '@/features/auth/permissions'
 import { useWorkspace } from '@/features/workspace/workspace-context'
-import { timestampSlug } from '@/lib/export'
-import { formatDate, formatPeso } from '@/lib/format'
+import { formatPesoCompact } from '@/lib/format'
 import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { exportSheet } from '@/lib/xlsx-export'
-import type { ActivityView, DisplayStatus } from '@/types/database'
-import { useActivities, useTrashActivities } from '../api'
+import type { ActivityPhysicalRow, ActivityView, DisplayStatus } from '@/types/database'
+import { useActivities } from '../api'
+import { ActivityDialog } from '../components/ActivityDialog'
 import { ActivityStatusBadge } from '../components/ActivityStatusBadge'
+import { exportPhysicalSheet } from '../physical-export'
+import { bedColumns, MONTH_LABELS, sum, twelve, useActivityPhysical } from '../physical'
 import { STATUS_META } from '../status'
 import { useActivityLookups } from '../use-activity-lookups'
 
@@ -47,12 +53,16 @@ const STATUS_ORDER: DisplayStatus[] = [
   'cancelled',
 ]
 
+/**
+ * Activities (Physical): monthly and quarterly physical targets and accomplishments
+ * (BED 2), with each activity's workflow. Activities in the WFP appear here by themselves.
+ */
 export default function ActivitiesListPage() {
-  const { profile, programs, isSuperadmin, user } = useAuth()
+  const { profile, programs, isSuperadmin } = useAuth()
   const ws = useWorkspace()
   const lookups = useActivityLookups()
-  const location = useLocationLookup()
   const [showTrash, setShowTrash] = useState(false)
+  const fyId = ws.fiscalYear?.id ?? null
   const {
     data = [],
     isPending,
@@ -60,19 +70,19 @@ export default function ActivitiesListPage() {
     refetch,
   } = useActivities({
     programIds: ws.selectedProgramIds,
-    fiscalYearId: ws.fiscalYear?.id ?? null,
+    fiscalYearId: fyId,
     trash: showTrash,
   })
-  const trash = useTrashActivities()
-
-  const [view, setView] = useState<'table' | 'kanban'>('table')
+  const { data: physical = new Map<string, ActivityPhysicalRow>() } = useActivityPhysical(
+    ws.selectedProgramIds,
+    fyId,
+  )
   const [status, setStatus] = useState<DisplayStatus | ''>('')
-  const [phase, setPhase] = useState('')
-  const [provinceId, setProvinceId] = useState('')
-  const [responsible, setResponsible] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [confirm, setConfirm] = useState<ConfirmOptions | null>(null)
+  const [search, setSearch] = useState('')
+  const [show, setShow] = useState<'targets' | 'done'>('targets')
+  const [open, setOpen] = useState<ActivityView | null>(null)
+  const [newOpen, setNewOpen] = useState(false)
+  const [closedPhases, setClosedPhases] = useState<Set<string>>(() => new Set())
 
   const programIds = programs.map((p) => p.id)
   const canCreate = programs.some(
@@ -81,20 +91,20 @@ export default function ActivitiesListPage() {
   const canSeeTrash = isSuperadmin || profile?.role === 'program_admin'
   const multiProgram = ws.selectedProgramIds.length > 1
 
-  // Status pills count everything except the status filter itself.
-  const base = useMemo(
+  // WFP order first, then the rest by title.
+  const ordered = useMemo(
     () =>
-      data.filter(
-        (a) =>
-          (!phase || a.current_phase === phase) &&
-          (!provinceId || a.province_id === provinceId) &&
-          (!responsible ||
-            a.responsible_user_id === (responsible === 'me' ? user?.id : responsible)) &&
-          (!from || (a.start_date ?? '') >= from) &&
-          (!to || (a.start_date ?? '') <= to),
-      ),
-    [data, phase, provinceId, responsible, from, to, user?.id],
+      [...data].sort((a, b) => {
+        const x = physical.get(a.id)?.wfp_order ?? Number.MAX_SAFE_INTEGER
+        const y = physical.get(b.id)?.wfp_order ?? Number.MAX_SAFE_INTEGER
+        return x - y || a.title.localeCompare(b.title)
+      }),
+    [data, physical],
   )
+  const base = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q ? ordered.filter((a) => `${a.code} ${a.title}`.toLowerCase().includes(q)) : ordered
+  }, [ordered, search])
   const rows = useMemo(
     () => (status ? base.filter((a) => a.display_status === status) : base),
     [base, status],
@@ -105,347 +115,401 @@ export default function ActivitiesListPage() {
     return c
   }, [base])
 
-  const responsibles = useMemo(() => {
-    const ids = new Set(data.map((a) => a.responsible_user_id).filter(Boolean) as string[])
-    return lookups.people.filter((p) => ids.has(p.id))
-  }, [data, lookups.people])
+  const totals = useMemo(() => {
+    const targets = Array(12).fill(0) as number[]
+    const done = Array(12).fill(0) as number[]
+    let budget = 0
+    let obligated = 0
+    let disbursed = 0
+    for (const a of rows) {
+      const p = physical.get(a.id)
+      twelve(p?.monthly_targets).forEach((v, i) => (targets[i] += v))
+      twelve(p?.monthly_done).forEach((v, i) => (done[i] += v))
+      budget += Number(p?.wfp_budget ?? a.budget_amount ?? 0)
+      obligated += Number(p?.wfp_obligated ?? 0)
+      disbursed += Number(p?.wfp_disbursed ?? 0)
+    }
+    const cumulative = (xs: number[]) => {
+      let run = 0
+      return xs.map((v) => (run += v))
+    }
+    return {
+      targets,
+      done,
+      cumTargets: cumulative(targets),
+      cumDone: cumulative(done),
+      budget,
+      obligated,
+      disbursed,
+    }
+  }, [rows, physical])
 
-  const columns = useMemo<ColumnDef<ActivityView, unknown>[]>(
-    () => [
-      {
-        id: 'title',
-        header: 'Activity',
-        accessorFn: (a) => `${a.code} ${a.title}`,
-        sortingFn: (x, y) => x.original.title.localeCompare(y.original.title),
-        cell: ({ row: { original: a } }) => (
-          <div className="max-w-md">
-            <Link to={`/activities/${a.id}`} className="font-medium hover:underline">
-              {a.title}
-            </Link>
-            <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="font-mono">{a.code}</span>
-              {multiProgram && lookups.program.get(a.program_id) && (
-                <ProgramChip program={lookups.program.get(a.program_id)!} />
-              )}
-              {a.province_id && <span>{location.format(a, { short: true })}</span>}
-            </p>
-          </div>
-        ),
-      },
-      {
-        id: 'stage',
-        header: 'Stage',
-        accessorFn: (a) => a.current_stage_name ?? '',
-        cell: ({ row: { original: a } }) => (
-          <div className="min-w-36 text-sm">
-            {a.current_stage_name ?? (
-              <span className="text-muted-foreground">
-                {a.status === 'completed' ? 'Done' : '—'}
-              </span>
-            )}
-            <div className="mt-1 flex items-center gap-2">
-              <div className="bg-primary/15 h-1.5 w-20 overflow-hidden rounded-full">
-                <div
-                  className="bg-primary h-full rounded-full"
-                  style={{
-                    width: `${a.stages_total ? (a.stages_done / a.stages_total) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-              <span className="text-muted-foreground text-[11px] tabular-nums">
-                {a.stages_done}/{a.stages_total}
-              </span>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: 'status',
-        header: 'Status',
-        accessorFn: (a) => STATUS_ORDER.indexOf(a.display_status),
-        cell: ({ row: { original: a } }) => <ActivityStatusBadge status={a.display_status} />,
-      },
-      {
-        id: 'due',
-        header: 'Due',
-        accessorFn: (a) => a.due_date ?? '9999',
-        cell: ({ row: { original: a } }) => (
-          <div className="text-sm whitespace-nowrap">
-            {formatDate(a.due_date)}
-            {a.is_overdue && (
-              <span className="text-destructive block text-xs">{a.days_overdue}d overdue</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'responsible',
-        header: 'Responsible',
-        accessorFn: (a) => lookups.name.person(a.responsible_user_id),
-        cell: ({ getValue }) => <span className="text-sm">{(getValue() as string) || '—'}</span>,
-      },
-      {
-        id: 'budget',
-        header: 'Budget',
-        accessorFn: (a) => Number(a.budget_amount ?? 0),
-        cell: ({ row: { original: a } }) => (
-          <span className="text-sm whitespace-nowrap tabular-nums">
-            {formatPeso(a.budget_amount)}
-          </span>
-        ),
-      },
-    ],
-    [lookups, location, multiProgram],
-  )
+  const statusRows = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const a of rows) {
+      const status = physical.get(a.id)?.wfp_status
+      if (status) counts.set(status, (counts.get(status) ?? 0) + 1)
+    }
+    return [...counts]
+      .sort((x, y) => y[1] - x[1])
+      .map(([label, value]) => ({ key: label, label, value }))
+  }, [rows, physical])
 
-  const exportRows = (list: ActivityView[]) =>
-    exportSheet(
-      `payew-activities-${timestampSlug()}.xlsx`,
-      'Activities',
-      [
-        'Code',
-        'Title',
-        'Program',
-        'Category',
-        'Location',
-        'Current stage',
-        'Stages done',
-        'Status',
-        'Start',
-        'End',
-        'Due',
-        'Days overdue',
-        'Responsible',
-        'Budget (PHP)',
-        'Beneficiaries',
-        'Participants',
-      ],
-      list.map((a) => [
-        a.code,
-        a.title,
-        lookups.name.program(a.program_id),
-        lookups.name.category(a.category_id),
-        a.province_id ? location.format(a) : '',
-        a.current_stage_name ?? '',
-        `${a.stages_done}/${a.stages_total}`,
-        STATUS_META[a.display_status].label,
-        a.start_date ?? '',
-        a.end_date ?? '',
-        a.due_date ?? '',
-        a.days_overdue || '',
-        lookups.name.person(a.responsible_user_id),
-        a.budget_amount ?? '',
-        a.beneficiaries_count,
-        a.participants_total,
-      ]),
-    ).catch((e) => toast.error(errorMessage(e)))
+  const unitOf = (a: ActivityView) =>
+    lookups.name.unit(a.unit_id) || physical.get(a.id)?.unit_label || ''
+  const exportFile = () =>
+    exportPhysicalSheet({
+      rows,
+      physical,
+      unitOf,
+      programLabel:
+        ws.programFilter === 'all' ? 'All programs' : lookups.name.program(ws.programFilter),
+      fiscalYear: ws.fiscalYear?.label ?? '',
+    }).catch((e) => toast.error(errorMessage(e, 'The file could not be created.')))
 
-  const trashSelected = (list: ActivityView[], clear: () => void) => {
-    const allowed = list.every((a) => canManageProgram(profile, programIds, a.program_id))
-    if (!allowed) return toast.error('Only program admins can move activities to Trash.')
-    setConfirm({
-      title: showTrash
-        ? `Restore ${list.length} activities?`
-        : `Move ${list.length} activities to Trash?`,
-      description: showTrash
-        ? undefined
-        : 'Use Trash for records created by mistake; cancel real activities instead.',
-      confirmLabel: showTrash ? 'Restore' : 'Move to Trash',
-      destructive: !showTrash,
-      onConfirm: () =>
-        trash
-          .mutateAsync({ ids: list.map((a) => a.id), restore: showTrash })
-          .then(() => {
-            toast.success(showTrash ? 'Restored' : 'Moved to Trash')
-            clear()
-          })
-          .catch((e) => toast.error(errorMessage(e))),
-    })
-  }
+  const accomplishment =
+    sum(totals.targets) > 0 ? (sum(totals.done) / sum(totals.targets)) * 100 : null
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title={showTrash ? 'Activities · Trash' : 'Activities'}
-        description={`${ws.fiscalYear?.label ?? ''} · ${ws.programFilter === 'all' ? 'All programs' : lookups.name.program(ws.programFilter)}`}
+        title={showTrash ? 'Activities (Physical) · Trash' : 'Activities (Physical)'}
+        description={`${ws.fiscalYear?.label ?? ''} · ${ws.programFilter === 'all' ? 'All programs' : lookups.name.program(ws.programFilter)} · activities in the WFP appear here automatically`}
         actions={
           <>
-            <Button variant="outline" disabled={!rows.length} onClick={() => void exportRows(rows)}>
+            <Button variant="outline" disabled={!rows.length} onClick={() => void exportFile()}>
               <DownloadIcon /> Export
             </Button>
             {canCreate && !showTrash && (
-              <Button asChild>
-                <Link to="/activities/new">
-                  <PlusIcon /> New activity
-                </Link>
+              <Button onClick={() => setNewOpen(true)}>
+                <PlusIcon /> New activity
               </Button>
             )}
           </>
         }
       />
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-        <StatusPill
-          active={!status}
-          onClick={() => setStatus('')}
-          label="All"
-          count={base.length}
-        />
-        {STATUS_ORDER.map((s) => (
-          <StatusPill
-            key={s}
-            active={status === s}
-            onClick={() => setStatus(status === s ? '' : s)}
-            label={STATUS_META[s].label}
-            count={counts[s] ?? 0}
-            icon={STATUS_META[s].icon}
-            danger={s === 'delayed'}
-          />
-        ))}
-      </div>
+      {!showTrash && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardContent className="space-y-2 pt-4">
+              <div>
+                <p className="text-sm font-semibold">Physical targets vs accomplishments</p>
+                <p className="text-muted-foreground text-xs">
+                  Cumulative, by month, for the activities listed below.
+                </p>
+              </div>
+              <FlowChart
+                title="Cumulative physical targets and accomplishments by month"
+                labels={MONTH_LABELS}
+                series={[
+                  {
+                    label: 'Target',
+                    stroke: 'stroke-viz-1',
+                    fill: 'fill-viz-1',
+                    swatch: 'bg-viz-1',
+                    values: totals.cumTargets,
+                  },
+                  {
+                    label: 'Accomplished',
+                    stroke: 'stroke-viz-2',
+                    fill: 'fill-viz-2',
+                    swatch: 'bg-viz-2',
+                    values: totals.cumDone,
+                  },
+                ]}
+                format={(v) => v.toLocaleString('en-PH', { maximumFractionDigits: 1 })}
+              />
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+            <Tile
+              label="Activities"
+              value={String(rows.length)}
+              hint={`${counts.completed ?? 0} completed · ${counts.delayed ?? 0} delayed`}
+            />
+            <Tile
+              label="Physical accomplishment"
+              value={accomplishment === null ? '—' : `${accomplishment.toFixed(1)}%`}
+              hint={`${sum(totals.done)} of ${sum(totals.targets)} monthly targets`}
+            />
+            <Tile
+              label="Budget (WFP)"
+              value={formatPesoCompact(totals.budget)}
+              hint={`Obligated ${formatPesoCompact(totals.obligated)} · disbursed ${formatPesoCompact(totals.disbursed)}`}
+            />
+            <Card className="col-span-2 gap-1 py-3 lg:col-span-1">
+              <CardContent className="space-y-2 px-4">
+                <p className="text-muted-foreground text-xs">By status (from the WFP)</p>
+                <BarList
+                  labelWidth="w-28"
+                  rows={statusRows}
+                  emptyText="Set a status in the WFP or in an activity’s workflow."
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <SelectNative
-          aria-label="Stage"
-          className="w-48"
-          value={phase}
-          onChange={(e) => setPhase(e.target.value)}
-        >
-          <option value="">All stages</option>
-          {PHASES.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.label}
-            </option>
-          ))}
-        </SelectNative>
-        <SelectNative
-          aria-label="Province"
-          className="w-40"
-          value={provinceId}
-          onChange={(e) => setProvinceId(e.target.value)}
-        >
-          <option value="">All provinces</option>
-          {[...location.province.values()].map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </SelectNative>
-        <SelectNative
-          aria-label="Responsible"
-          className="w-44"
-          value={responsible}
-          onChange={(e) => setResponsible(e.target.value)}
-        >
-          <option value="">Anyone responsible</option>
-          <option value="me">Assigned to me</option>
-          {responsibles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name}
-            </option>
-          ))}
-        </SelectNative>
-        <label className="text-muted-foreground flex items-center gap-1.5 text-sm">
-          Start
-          <Input
-            type="date"
-            aria-label="Start from"
-            className="w-38"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+          <StatusPill
+            active={!status}
+            onClick={() => setStatus('')}
+            label="All"
+            count={base.length}
           />
-          to
+          {STATUS_ORDER.map((s) => (
+            <StatusPill
+              key={s}
+              active={status === s}
+              onClick={() => setStatus(status === s ? '' : s)}
+              label={STATUS_META[s].label}
+              count={counts[s] ?? 0}
+              icon={STATUS_META[s].icon}
+              danger={s === 'delayed'}
+            />
+          ))}
+        </div>
+        <div className="relative ml-auto w-full sm:w-64">
+          <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
           <Input
-            type="date"
-            aria-label="Start to"
-            className="w-38"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
+            aria-label="Search activities"
+            placeholder="Search title or code…"
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-        </label>
+        </div>
+        <div className="bg-card inline-flex rounded-md border p-0.5" role="group" aria-label="Show">
+          {(
+            [
+              ['targets', 'Targets'],
+              ['done', 'Accomplished'],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={show === v}
+              onClick={() => setShow(v)}
+              className={cn(
+                'rounded px-3 py-1 text-sm',
+                show === v ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {canSeeTrash && (
           <label className="flex items-center gap-2 px-1 text-sm">
             <Checkbox checked={showTrash} onCheckedChange={(c) => setShowTrash(!!c)} /> Trash
           </label>
         )}
-        <div
-          className="bg-card ml-auto inline-flex rounded-md border p-0.5"
-          role="group"
-          aria-label="View"
-        >
-          {(
-            [
-              ['table', ListIcon, 'Table'],
-              ['kanban', KanbanSquareIcon, 'Board'],
-            ] as const
-          ).map(([v, Icon, label]) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              onClick={() => setView(v)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm',
-                view === v ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
-              )}
-            >
-              <Icon className="size-4" /> {label}
-            </button>
-          ))}
-          <Link
-            to="/calendar"
-            className="text-muted-foreground hover:bg-accent inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm"
-            title="Calendar view (Phase 10)"
-          >
-            <CalendarDaysIcon className="size-4" /> Calendar
-          </Link>
-        </div>
       </div>
 
       {isError ? (
         <ErrorState onRetry={() => void refetch()} />
-      ) : view === 'kanban' ? (
-        isPending ? (
-          <Skeleton className="h-96" />
-        ) : (
-          <KanbanBoard rows={rows} lookups={lookups} multiProgram={multiProgram} />
-        )
-      ) : (
-        <DataTable
-          data={rows}
-          columns={columns}
-          loading={isPending}
-          getRowId={(a) => a.id}
-          searchPlaceholder="Search title or code…"
-          selectable
-          bulkActions={(selected, clear) => (
-            <>
-              <Button size="sm" variant="outline" onClick={() => void exportRows(selected)}>
-                <DownloadIcon /> Export selected
-              </Button>
-              {canSeeTrash && (
-                <Button size="sm" variant="outline" onClick={() => trashSelected(selected, clear)}>
-                  <Trash2Icon /> {showTrash ? 'Restore' : 'Move to Trash'}
-                </Button>
-              )}
-            </>
-          )}
-          rowClassName={(a) => (a.display_status === 'cancelled' ? 'opacity-60' : undefined)}
-          empty={
-            <EmptyState
-              icon={ListChecksIcon}
-              title={showTrash ? 'Trash is empty' : 'No activities found'}
-              description={
-                showTrash
-                  ? undefined
-                  : 'Change the filters or fiscal year, or create a new activity.'
-              }
-            />
+      ) : isPending ? (
+        <Skeleton className="h-96" />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={ListChecksIcon}
+          title={showTrash ? 'Trash is empty' : 'No activities found'}
+          description={
+            showTrash
+              ? undefined
+              : 'Add activities in the WFP: a row with an activity and a unit of measure.'
           }
         />
+      ) : (
+        <div className="bg-card scroll-strong max-h-[calc(100vh-8rem)] overflow-auto rounded-md border">
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            <thead className="text-muted-foreground [&_th]:bg-muted text-xs [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th:first-child]:z-30">
+              <tr>
+                <th className="bg-muted sticky left-0 z-10 min-w-72 border-b px-3 py-2 text-left font-medium">
+                  Activity
+                </th>
+                <th className="border-b px-2 py-2 text-left font-medium">Unit</th>
+                {bedColumns(Array(12).fill(0)).map((c) => (
+                  <th
+                    key={c.label}
+                    className={cn(
+                      'border-b px-1.5 py-2 text-right font-medium whitespace-nowrap',
+                      c.quarter && 'text-foreground bg-muted',
+                    )}
+                  >
+                    {c.label}
+                  </th>
+                ))}
+                <th className="min-w-44 border-b px-3 py-2 text-left font-medium">Workflow</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a, index) => {
+                const p = physical.get(a.id)
+                const phase = p?.wfp_phase ?? null
+                const newPhase =
+                  phase !== (physical.get(rows[index - 1]?.id ?? '')?.wfp_phase ?? null)
+                const values = twelve(show === 'targets' ? p?.monthly_targets : p?.monthly_done)
+                return (
+                  <Fragment key={a.id}>
+                    {newPhase && phase && (
+                      <tr className="bg-primary/5">
+                        <th
+                          colSpan={20}
+                          scope="colgroup"
+                          className="border-b px-3 py-1.5 text-left text-xs font-semibold"
+                        >
+                          <button
+                            type="button"
+                            aria-expanded={!closedPhases.has(phase)}
+                            className="hover:text-primary sticky left-3 inline-flex items-center gap-1.5"
+                            onClick={() =>
+                              setClosedPhases((old) => {
+                                const next = new Set(old)
+                                if (next.has(phase)) next.delete(phase)
+                                else next.add(phase)
+                                return next
+                              })
+                            }
+                          >
+                            {closedPhases.has(phase) ? (
+                              <ChevronRightIcon className="size-4" />
+                            ) : (
+                              <ChevronDownIcon className="size-4" />
+                            )}
+                            {phase}
+                            <span className="text-muted-foreground font-normal">
+                              · {rows.filter((x) => physical.get(x.id)?.wfp_phase === phase).length}{' '}
+                              activities
+                            </span>
+                          </button>
+                        </th>
+                      </tr>
+                    )}
+                    <tr
+                      hidden={!!phase && closedPhases.has(phase)}
+                      tabIndex={0}
+                      onClick={() => setOpen(a)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setOpen(a)
+                        }
+                      }}
+                      className={cn(
+                        'hover:bg-accent/50 focus-visible:bg-accent/60 group cursor-pointer outline-none',
+                        a.display_status === 'cancelled' && 'opacity-60',
+                      )}
+                    >
+                      <td className="bg-card group-hover:bg-accent/50 sticky left-0 z-10 border-b px-3 py-2">
+                        <p className="line-clamp-2 font-medium">{a.title}</p>
+                        <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="font-mono">{a.code}</span>
+                          {multiProgram && lookups.program.get(a.program_id) && (
+                            <ProgramChip program={lookups.program.get(a.program_id)!} />
+                          )}
+                          {p?.wfp_row_id && !p.wfp_removed_at && (
+                            <Badge variant="outline">WFP</Badge>
+                          )}
+                          {p?.wfp_removed_at && (
+                            <Badge variant="outline" className="border-warning/50 text-warning">
+                              Not in WFP
+                            </Badge>
+                          )}
+                        </p>
+                      </td>
+                      <td className="border-b px-2 py-2 text-xs whitespace-nowrap">
+                        {unitOf(a) || '—'}
+                      </td>
+                      {bedColumns(values).map((c) => (
+                        <td
+                          key={c.label}
+                          className={cn(
+                            'border-b px-1.5 py-2 text-right tabular-nums',
+                            c.quarter && 'bg-muted/40 font-medium',
+                          )}
+                        >
+                          {c.value || <span className="text-muted-foreground">–</span>}
+                        </td>
+                      ))}
+                      <td className="border-b px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <ActivityStatusBadge status={a.display_status} />
+                          {p?.wfp_status && <Badge variant="outline">{p.wfp_status}</Badge>}
+                        </div>
+                        <p className="text-muted-foreground mt-1 truncate text-xs">
+                          {a.current_stage_name ?? (a.status === 'completed' ? 'Done' : '—')} ·{' '}
+                          {a.stages_done}/{a.stages_total}
+                        </p>
+                      </td>
+                    </tr>
+                  </Fragment>
+                )
+              })}
+              {/* Stays at the bottom of the table while the rows scroll. */}
+              <tr className="[&_td]:bg-muted font-semibold [&_td]:sticky [&_td]:bottom-0 [&_td]:z-20 [&_td]:border-t-2">
+                <td className="left-0 !z-30 px-3 py-2">Total</td>
+                <td />
+                {bedColumns(show === 'targets' ? totals.targets : totals.done).map((c) => (
+                  <td key={c.label} className="px-1.5 py-2 text-right tabular-nums">
+                    {c.value || '–'}
+                  </td>
+                ))}
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </div>
       )}
-      <ConfirmDialog options={confirm} onClose={() => setConfirm(null)} />
+
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add activities in the WFP</DialogTitle>
+            <DialogDescription>
+              Activities come from the Work and Financial Plan, so they are typed only once. In the
+              WFP, add a row with the activity under its phase and give it a unit of measure and a
+              target. When you save the WFP, the activity appears here with its budget.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setNewOpen(false)}>
+              Cancel
+            </Button>
+            <Button asChild>
+              <Link to="/finance">
+                <FileSpreadsheetIcon /> Go to the WFP
+              </Link>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {open && (
+        <ActivityDialog
+          activity={open}
+          physical={physical.get(open.id)}
+          unitName={unitOf(open)}
+          canEdit={!showTrash && canWriteProgram(profile, programIds, open.program_id)}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <Card className="gap-1 py-3">
+      <CardContent className="px-4">
+        <p className="text-muted-foreground text-xs">{label}</p>
+        <p className="text-xl font-semibold tabular-nums">{value}</p>
+        <p className="text-muted-foreground truncate text-xs">{hint}</p>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -485,86 +549,5 @@ function StatusPill({
         {count}
       </span>
     </button>
-  )
-}
-
-function KanbanBoard({
-  rows,
-  lookups,
-  multiProgram,
-}: {
-  rows: ActivityView[]
-  lookups: ReturnType<typeof useActivityLookups>
-  multiProgram: boolean
-}) {
-  const columns = [
-    ...PHASES.filter((p) => p.key !== 'closed').map((p) => ({
-      key: p.key as string,
-      label: p.label,
-      items: rows.filter(
-        (a) => a.status !== 'completed' && a.status !== 'cancelled' && a.current_phase === p.key,
-      ),
-    })),
-    {
-      key: 'closed',
-      label: PHASE_LABEL.closed,
-      items: rows.filter(
-        (a) => a.status !== 'completed' && a.status !== 'cancelled' && a.current_phase === 'closed',
-      ),
-    },
-    { key: 'completed', label: 'Completed', items: rows.filter((a) => a.status === 'completed') },
-  ].filter((c) => c.items.length > 0 || c.key !== 'other')
-
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {columns.map((col) => (
-        <section
-          key={col.key}
-          className="bg-muted/40 flex w-64 shrink-0 flex-col rounded-lg border"
-          aria-label={col.label}
-        >
-          <header className="flex items-center justify-between border-b px-3 py-2">
-            <h3 className="text-sm font-semibold">{col.label}</h3>
-            <Badge variant="secondary">{col.items.length}</Badge>
-          </header>
-          <ul className="flex max-h-[65vh] flex-col gap-2 overflow-y-auto p-2">
-            {col.items.map((a) => (
-              <li key={a.id}>
-                <Link
-                  to={`/activities/${a.id}?tab=workflow`}
-                  className={cn(
-                    'bg-card hover:border-primary/50 block rounded-md border p-2.5 text-sm shadow-xs transition-colors',
-                    a.display_status === 'delayed' && 'border-l-destructive border-l-4',
-                  )}
-                >
-                  <p className="line-clamp-2 font-medium">{a.title}</p>
-                  <p className="text-muted-foreground mt-1 font-mono text-[11px]">{a.code}</p>
-                  <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                    {multiProgram && lookups.program.get(a.program_id) && (
-                      <ProgramChip program={lookups.program.get(a.program_id)!} />
-                    )}
-                    {a.current_stage_name && col.key !== 'completed' && (
-                      <span className="truncate">{a.current_stage_name}</span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs">
-                    <span className={a.is_overdue ? 'text-destructive' : 'text-muted-foreground'}>
-                      Due {formatDate(a.due_date)}
-                      {a.is_overdue && ` · ${a.days_overdue}d late`}
-                    </span>
-                    <span className="text-muted-foreground tabular-nums">
-                      {a.stages_done}/{a.stages_total}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-            {col.items.length === 0 && (
-              <li className="text-muted-foreground px-1 py-4 text-center text-xs">None</li>
-            )}
-          </ul>
-        </section>
-      ))}
-    </div>
   )
 }

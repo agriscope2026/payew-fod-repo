@@ -8,86 +8,12 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarList } from '@/components/charts/BarList'
-import { BulletBars } from '@/components/charts/BulletBars'
-import { FlowChart } from '@/components/charts/FlowChart'
 import { StatusStrip, type StatusPart } from '@/components/charts/StatusStrip'
-import { pct } from '@/features/finance/finance-utils'
 import { PHASES } from '@/features/workflows/constants'
-import { formatDate, formatPeso, formatPesoCompact, formatPercent } from '@/lib/format'
+import { formatDate, formatPeso, formatPesoCompact } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { DashboardSummary } from '@/types/database'
-import { monthLabel } from '../format'
 import { Panel } from './Panel'
-
-// ---------------------------------------------------------------------------
-// Money
-// ---------------------------------------------------------------------------
-
-/** Cumulative obligations and disbursements across the fiscal year vs the allotment. */
-export function FlowPanel({ data }: { data: DashboardSummary }) {
-  const cum = (key: 'obligated' | 'disbursed') => {
-    let run = 0
-    return data.monthly.map((m) => (run += Number(m[key])))
-  }
-  // Months after today stay off the lines (no flat projection).
-  const thisMonth = data.as_of.slice(0, 7)
-  const upto = data.monthly.findIndex((m) => m.month > thisMonth)
-  const cut = <T,>(xs: T[]) => (upto === -1 ? xs : xs.slice(0, Math.max(upto, 1)))
-
-  return (
-    <Panel
-      title="Budget vs obligation vs disbursement"
-      description="Cumulative ORS and DV amounts by month against the allotment."
-      className="lg:col-span-2"
-    >
-      <FlowChart
-        title="Cumulative obligations and disbursements by month"
-        labels={cut(data.monthly.map((m) => monthLabel(m.month)))}
-        series={[
-          {
-            label: 'Obligated (ORS)',
-            stroke: 'stroke-viz-1',
-            fill: 'fill-viz-1',
-            swatch: 'bg-viz-1',
-            values: cut(cum('obligated')),
-          },
-          {
-            label: 'Disbursed (DV)',
-            stroke: 'stroke-viz-2',
-            fill: 'fill-viz-2',
-            swatch: 'bg-viz-2',
-            values: cut(cum('disbursed')),
-          },
-        ]}
-        reference={{ label: 'Allotment', value: Number(data.kpis.allotted) }}
-        format={formatPesoCompact}
-      />
-    </Panel>
-  )
-}
-
-export function ByClassPanel({ rows }: { rows: DashboardSummary['by_class'] }) {
-  return (
-    <Panel title="By expense class" description="Allotment, obligated and disbursed.">
-      <BulletBars
-        series={['Allotment', 'Obligated', 'Disbursed']}
-        format={formatPeso}
-        emptyText="No allotments or obligations yet."
-        rows={rows.map((r) => ({
-          key: r.code,
-          label: r.code,
-          values: [Number(r.allotted), Number(r.obligated), Number(r.disbursed)],
-          note: `${formatPercent(pct(Number(r.obligated), Number(r.allotted)), 0)} obligated`,
-          href: '/finance',
-        }))}
-      />
-    </Panel>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Status mix and procurement money
-// ---------------------------------------------------------------------------
 
 const MUTED = 'text-muted-foreground'
 
@@ -264,79 +190,6 @@ export function FunnelPanel({ rows }: { rows: DashboardSummary['funnel'] }) {
             <>
               <strong>{label(r.phase)}</strong>: {r.packages} package{r.packages === 1 ? '' : 's'},{' '}
               {formatPeso(Number(r.amount))}
-            </>
-          ),
-        }))}
-      />
-    </Panel>
-  )
-}
-
-export function SupplierPanel({ rows }: { rows: DashboardSummary['by_supplier'] }) {
-  return (
-    <Panel title="Spending by supplier" description="Top suppliers by contract amount.">
-      <BulletBars
-        series={['Contract', 'Paid']}
-        format={formatPeso}
-        emptyText="No awarded packages yet."
-        rows={rows.map((r) => ({
-          key: r.id,
-          label: r.name,
-          values: [Number(r.contract), Number(r.paid)],
-          note: formatPesoCompact(Number(r.contract)),
-          href: `/suppliers/${r.id}`,
-        }))}
-      />
-    </Panel>
-  )
-}
-
-export function CategoryPanel({ rows }: { rows: DashboardSummary['by_category'] }) {
-  return (
-    <Panel
-      title="Spending by category"
-      description="ABC, contract and paid per procurement category."
-    >
-      <BulletBars
-        series={['ABC', 'Contract', 'Paid']}
-        format={formatPeso}
-        emptyText="No procurement packages yet."
-        rows={rows.map((r) => ({
-          key: r.code ?? r.name,
-          label: r.name,
-          values: [Number(r.abc), Number(r.contract), Number(r.paid)],
-          note: `${r.packages} pkg · ${formatPesoCompact(Number(r.contract))}`,
-        }))}
-      />
-    </Panel>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Aging and deliveries
-// ---------------------------------------------------------------------------
-
-const AGE_FILL = ['bg-viz-ord-1', 'bg-viz-ord-2', 'bg-viz-ord-3', 'bg-viz-ord-4']
-
-export function AgingPanel({ rows }: { rows: DashboardSummary['aging'] }) {
-  const total = rows.reduce((s, r) => s + Number(r.amount), 0)
-  return (
-    <Panel
-      title="Obligation aging"
-      description={`Unpaid ORS balances by age · ${formatPeso(total)} in total.`}
-    >
-      <BarList
-        labelWidth="w-24"
-        emptyText="No unpaid obligations."
-        rows={rows.map((r, i) => ({
-          key: r.bucket,
-          label: r.bucket,
-          value: Number(r.amount),
-          fill: AGE_FILL[i],
-          valueLabel: `${formatPesoCompact(Number(r.amount))} · ${r.count} ORS`,
-          detail: (
-            <>
-              <strong>{r.bucket}</strong>: {r.count} ORS, {formatPeso(Number(r.amount))} unpaid
             </>
           ),
         }))}

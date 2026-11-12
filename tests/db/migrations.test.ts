@@ -51,6 +51,7 @@ describe('migrations', () => {
     const keys = await db.query<{ key: string }>(`select key from public.app_settings order by key`)
     expect(keys.rows.map((k) => k.key)).toEqual([
       'approvals',
+      'dashboard_default_layout',
       'dashboard_thresholds',
       'maintenance_banner',
       'overdue_notice_template',

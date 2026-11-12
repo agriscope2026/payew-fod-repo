@@ -1,7 +1,8 @@
 import { MenuIcon, XIcon } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { Suspense, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NotificationBell } from '@/features/notifications/components/NotificationBell'
@@ -13,6 +14,8 @@ import { WorkspaceFilters } from './WorkspaceFilters'
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { pathname } = useLocation()
+  const wide = pathname.startsWith('/finance') || pathname === '/activities'
 
   return (
     <div className="flex min-h-dvh">
@@ -68,7 +71,13 @@ export function AppShell() {
           <WorkspaceFilters />
         </div>
 
-        <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6">
+        <main
+          className={cn(
+            'mx-auto w-full flex-1 px-4 py-6 sm:px-6',
+            // Sheets use the whole width of the screen.
+            !wide && 'max-w-[1600px]',
+          )}
+        >
           <Suspense fallback={<PageLoader />}>
             <Outlet />
           </Suspense>

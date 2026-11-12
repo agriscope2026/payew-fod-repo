@@ -90,6 +90,142 @@ export type NotificationRow = {
   dedupe_key: string | null
 }
 
+export type FinanceSheetKind =
+  | 'WFP'
+  | 'PPMP'
+  | 'APP'
+  | 'allotments'
+  | 'obligations'
+  | 'disbursements'
+
+export type FinanceSheetRow = {
+  id: string
+  program_id: string
+  fiscal_year_id: string
+  kind: FinanceSheetKind
+  template_key: string | null
+  is_custom: boolean
+  source_name: string | null
+  version: number
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+}
+
+export type FinanceSheetDataRow = {
+  sheet_id: string
+  data: Json
+  draft: Json | null
+  draft_source: string | null
+  draft_updated_at: string | null
+  draft_updated_by: string | null
+}
+
+export type FinanceSheetVersionRow = {
+  id: string
+  sheet_id: string
+  version: number
+  data: Json
+  saved_at: string
+  saved_by: string | null
+}
+
+export type CardAggregate = 'sum' | 'average' | 'count' | 'min' | 'max' | 'value'
+export type CardRange = { r1: string; c1: string; r2: string; c2: string }
+
+export type DashboardCardRow = {
+  id: string
+  sheet_id: string
+  program_id: string
+  fiscal_year_id: string
+  title: string
+  details: string | null
+  range: CardRange
+  agg: CardAggregate
+  number_format: 'peso' | 'number' | 'integer' | 'percent'
+  sub_label: string | null
+  sub_range: CardRange | null
+  sub_agg: CardAggregate | null
+  placement: 'card' | 'budget_line'
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
+
+export type LinkedFileKind =
+  | 'presentation'
+  | 'spreadsheet'
+  | 'document'
+  | 'pdf'
+  | 'image'
+  | 'video'
+  | 'folder'
+  | 'link'
+
+export type LinkedFileRow = {
+  id: string
+  program_id: string
+  fiscal_year_id: string | null
+  title: string
+  url: string
+  kind: LinkedFileKind
+  description: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
+
+export type ActivityPhysicalRow = {
+  activity_id: string
+  program_id: string
+  fiscal_year_id: string
+  monthly_targets: number[]
+  monthly_done: number[]
+  status_note: string | null
+  unit_label: string | null
+  wfp_sheet_id: string | null
+  wfp_row_id: string | null
+  wfp_order: number | null
+  wfp_budget: number | null
+  wfp_obligated: number | null
+  wfp_disbursed: number | null
+  wfp_removed_at: string | null
+  wfp_phase: string | null
+  wfp_status: string | null
+  updated_at: string
+  updated_by: string | null
+}
+
+export type ProgramYearBudgetRow = {
+  id: string
+  program_id: string
+  fiscal_year_id: string
+  total_budget: number
+  created_at: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export type ImportTemplateRow = {
+  id: string
+  target: string
+  name: string
+  header_row: number
+  data_row: number
+  columns: Json
+  source_url: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
+
+export type DashboardLayoutRow = {
+  user_id: string
+  layout: Json
+  updated_at: string
+}
+
 export type AppSettingRow = {
   key: string
   value: Json
@@ -1023,6 +1159,14 @@ export const MONTH_KEYS = [
 ] as const
 export type MonthKey = (typeof MONTH_KEYS)[number]
 
+export type WfpReportedRow = {
+  program_id: string
+  fiscal_year_id: string
+  obligated: number
+  disbursed: number
+  has_ors: boolean
+}
+
 export type FinancePlanLine = {
   id: string
   plan_id: string
@@ -1040,6 +1184,8 @@ export type FinancePlanLine = {
   quantity: number | null
   unit_cost: number | null
   amount: number
+  obligated: number
+  disbursed: number
   remarks: string | null
   created_at: string
   updated_at: string
@@ -1369,6 +1515,21 @@ export type Database = {
       program_memberships: Table<ProgramMembershipRow, 'program_id' | 'user_id'>
       notifications: Table<NotificationRow, 'user_id' | 'type' | 'title'>
       app_settings: Table<AppSettingRow, 'key' | 'value'>
+      import_templates: Table<ImportTemplateRow, 'target' | 'name'>
+      program_year_budgets: Table<
+        ProgramYearBudgetRow,
+        'program_id' | 'fiscal_year_id' | 'total_budget'
+      >
+      dashboard_layouts: Table<DashboardLayoutRow, 'user_id' | 'layout'>
+      activity_physical: Table<ActivityPhysicalRow, 'activity_id'>
+      linked_files: Table<LinkedFileRow, 'program_id' | 'title' | 'url' | 'kind'>
+      finance_sheets: Table<FinanceSheetRow>
+      finance_sheet_data: Table<FinanceSheetDataRow>
+      finance_sheet_versions: Table<FinanceSheetVersionRow>
+      dashboard_cards: Table<
+        DashboardCardRow,
+        'sheet_id' | 'program_id' | 'fiscal_year_id' | 'title' | 'range' | 'agg'
+      >
       audit_logs: Table<AuditLogRow, 'action' | 'table_name'>
       announcements: Table<AnnouncementRow, 'title' | 'body'>
       announcement_reads: Table<{ announcement_id: string; user_id: string; read_at: string }, 'announcement_id' | 'user_id'>
@@ -1445,6 +1606,7 @@ export type Database = {
       v_package_financial_summary: { Row: PackageFinance; Relationships: [] }
       v_activity_financials: { Row: ActivityFinance; Relationships: [] }
       v_program_finance: { Row: ProgramFinance; Relationships: [] }
+      v_wfp_reported: { Row: WfpReportedRow; Relationships: [] }
       v_payables: { Row: PayableRow; Relationships: [] }
       v_approval_requests: { Row: ApprovalView; Relationships: [] }
       v_activity_progress: { Row: ProgressUpdateRow; Relationships: [] }
@@ -1580,6 +1742,42 @@ export type Database = {
         Returns: string | null
       }
       save_plan_rows: { Args: { p_plan_id: string; p_rows: Json }; Returns: number }
+      sync_wfp_activities: {
+        Args: { p_sheet_id: string; p_items: Json }
+        Returns: { created: number; updated: number; removed: number }
+      }
+      create_finance_sheet: {
+        Args: {
+          p_program_id: string
+          p_fiscal_year_id: string
+          p_kind: FinanceSheetKind
+          p_data: Json
+          p_template_key?: string | null
+        }
+        Returns: string
+      }
+      save_finance_sheet: {
+        Args: {
+          p_sheet_id: string
+          p_version: number
+          p_data: Json
+          p_is_custom: boolean
+          p_template_key?: string | null
+        }
+        Returns: number
+      }
+      save_finance_sheet_draft: {
+        Args: { p_sheet_id: string; p_draft: Json | null; p_source?: string | null }
+        Returns: undefined
+      }
+      finalize_finance_sheet: {
+        Args: { p_sheet_id: string; p_version: number; p_data: Json }
+        Returns: number
+      }
+      import_finance_records: {
+        Args: { p_kind: string; p_rows: Json }
+        Returns: { saved: number; flagged: { row: number; warnings: string[] }[] }
+      }
       set_plan_status: {
         Args: { p_plan_id: string; p_status: PlanStatus; p_remarks?: string | null }
         Returns: undefined

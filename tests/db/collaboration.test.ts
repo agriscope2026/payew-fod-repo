@@ -112,7 +112,10 @@ describe('comments', () => {
       expect(
         await s.q(`update public.comments set body = 'hacked' where id = $1 returning id`, [c.id]),
       ).toHaveLength(0)
-      const none = await s.q(`update public.comments set deleted_at = now() where id = $1 returning id`, [c.id])
+      const none = await s.q(
+        `update public.comments set deleted_at = now() where id = $1 returning id`,
+        [c.id],
+      )
       expect(none).toHaveLength(0)
 
       // Author edits (stamps edited_at); program admin can delete but not edit.
@@ -184,10 +187,9 @@ describe('notes', () => {
       )
 
       await s.as(USERS.amiaStaff2)
-      const seen = await s.q<{ id: string }>(
-        `select id from public.notes where entity_id = $1`,
-        [a.id],
-      )
+      const seen = await s.q<{ id: string }>(`select id from public.notes where entity_id = $1`, [
+        a.id,
+      ])
       expect(seen.map((n) => n.id)).toEqual([shared.id])
       expect(
         await s.q(`update public.notes set body = 'x' where id = $1 returning id`, [shared.id]),
@@ -278,11 +280,15 @@ describe('directives', () => {
 
       // Recipients cannot close; the issuer can, then it's read-only.
       await s.as(USERS.amiaStaff1)
-      await expect(s.q('select public.close_directive($1)', [id])).rejects.toThrow(/Only the issuer/)
+      await expect(s.q('select public.close_directive($1)', [id])).rejects.toThrow(
+        /Only the issuer/,
+      )
       await s.as(USERS.amiaAdmin)
       await s.q(`select public.close_directive($1, 'Thanks')`, [id])
       await s.as(USERS.amiaStaff2)
-      await expect(s.q('select public.acknowledge_directive($1)', [id])).rejects.toThrow(/no longer open/)
+      await expect(s.q('select public.acknowledge_directive($1)', [id])).rejects.toThrow(
+        /no longer open/,
+      )
 
       // Discussion on the directive reaches issuer and recipients.
       await comment(s, id, 'Late, sorry', { type: 'directive' })
@@ -297,10 +303,9 @@ describe('directives', () => {
     await inTx(db, async (s) => {
       await s.as(USERS.amiaAdmin)
       await expect(
-        s.q(
-          `insert into public.directives (program_id, title, body) values ($1, 'Direct', 'x')`,
-          [PROGRAMS.AMIA],
-        ),
+        s.q(`insert into public.directives (program_id, title, body) values ($1, 'Direct', 'x')`, [
+          PROGRAMS.AMIA,
+        ]),
       ).rejects.toThrow(/permission denied/)
     })
   })
@@ -331,9 +336,9 @@ describe('overdue notices', () => {
       expect(n.title).toMatch(/^Overdue notice from/)
 
       await s.as(USERS.amiaStaff1)
-      await expect(
-        s.q('select public.overdue_notice_draft($1)', [a.id]),
-      ).rejects.toThrow(/Only program admins/)
+      await expect(s.q('select public.overdue_notice_draft($1)', [a.id])).rejects.toThrow(
+        /Only program admins/,
+      )
     })
   })
 
@@ -506,9 +511,9 @@ describe('comment visibility', () => {
       expect(reply.visibility).toBe('admins') // inherited from the thread
 
       await s.as(USERS.amiaStaff1)
-      expect(
-        await s.q(`select 1 from public.comments where entity_id = $1`, [a.id]),
-      ).toHaveLength(0)
+      expect(await s.q(`select 1 from public.comments where entity_id = $1`, [a.id])).toHaveLength(
+        0,
+      )
       // The responsible staff member is not notified about admin-only threads.
       expect(await inbox(s, USERS.amiaStaff1, a.id, 'comment')).toHaveLength(0)
       const [m] = await inbox(s, USERS.superadmin, a.id, 'mention')
@@ -532,7 +537,9 @@ describe('comment visibility', () => {
         [a.id],
       )
       await s.as(USERS.amiaAdmin)
-      expect(await s.q(`select 1 from public.comments where entity_id = $1`, [a.id])).toHaveLength(0)
+      expect(await s.q(`select 1 from public.comments where entity_id = $1`, [a.id])).toHaveLength(
+        0,
+      )
     })
   })
 })

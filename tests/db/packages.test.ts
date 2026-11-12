@@ -198,9 +198,8 @@ describe('two-level workflow', () => {
       await s.asAdmin()
       await s.q(`update public.activity_tasks set is_done = true where package_id = $1`, [p1.id])
       await s.as(USERS.amiaAdmin)
-      await expect(act(s, t1[4].id, 'complete')).rejects.toThrow(
-        /package fields first: supplier_id, contract_amount, award_date/,
-      )
+      // Missing package fields are a warning in the app, not a block.
+      await act(s, t1[4].id, 'complete')
     })
   })
 

@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/table'
 import { RateBadge } from '@/features/finance/components/FinanceBits'
 import { pct, rateState } from '@/features/finance/finance-utils'
-import type { AppSettings, Thresholds } from '@/features/settings/api'
+import type { Thresholds } from '@/features/settings/api'
 import type { DashboardSummary } from '@/types/database'
 import { Panel } from './Panel'
 
@@ -17,15 +17,13 @@ const DEFAULT_BANDS: Thresholds = { green: 80, amber: 50 }
 
 /**
  * Per-program compliance: delivery on schedule, progress reporting, directive
- * responses, plan approval and the money rates (thresholds from Settings).
+ * responses and critical issues. Finance figures come from sheet cards instead.
  */
 export function ComplianceScorecard({
   rows,
-  thresholds,
   progressDays,
 }: {
   rows: DashboardSummary['compliance']
-  thresholds: AppSettings['dashboard_thresholds'] | undefined
   progressDays: number
 }) {
   return (
@@ -44,9 +42,6 @@ export function ComplianceScorecard({
                 <TableHead>On schedule</TableHead>
                 <TableHead>Progress updated</TableHead>
                 <TableHead>Directives on time</TableHead>
-                <TableHead>Obligation rate</TableHead>
-                <TableHead>Disbursement rate</TableHead>
-                <TableHead className="text-right">Plans approved</TableHead>
                 <TableHead className="text-right">Critical issues</TableHead>
               </TableRow>
             </TableHeader>
@@ -55,8 +50,6 @@ export function ComplianceScorecard({
                 const onSchedule = pct(r.on_schedule, r.activities)
                 const progress = pct(r.progress_current, r.ongoing)
                 const directives = pct(r.directives_on_time, r.directives_due)
-                const obligation = pct(r.obligated, r.allotted)
-                const disbursement = pct(r.disbursed, r.obligated)
                 return (
                   <TableRow key={r.program_id}>
                     <TableCell>
@@ -86,13 +79,6 @@ export function ComplianceScorecard({
                         {r.directives_on_time}/{r.directives_due} due
                       </Sub>
                     </TableCell>
-                    <TableCell>
-                      <Rate v={obligation} t={thresholds?.obligation_rate} />
-                    </TableCell>
-                    <TableCell>
-                      <Rate v={disbursement} t={thresholds?.disbursement_rate} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.plans_approved}/3</TableCell>
                     <TableCell
                       className={
                         r.critical_issues > 0

@@ -182,6 +182,7 @@ R2 setup: a private bucket, a CORS rule allowing `GET, PUT, HEAD` from your app 
 
 ## Finance (Phase 7)
 
+- **Add data (Google Sheet, file or manual).** WFP/PPMP/APP, Allotments, the ORS and DV registers, and Activities each have an *Add data* button. Paste a link to a sheet shared as "Anyone with the link", upload an Excel/CSV file, or type rows in. Map the columns, review and edit every row, then *Proceed and save*; each batch saves all-or-nothing. Templates can be changed, saved, shared and downloaded as `.xlsx`. Import ORS before the DVs charged to them; each DV row pays one ORS.
 - **Plans.** Finance → *WFP / PPMP / APP* opens one sheet per program and year in an Excel-like grid (arrow keys, type to edit, Ctrl+C/Ctrl+V with Excel, Shift-select, import/export .xlsx). Amount = qty × unit cost; rows whose monthly schedule doesn't add up to the amount are flagged. PPMP/APP rows can be tagged to a package. Draft → Submit → Approve (program admin); approved plans are read-only until reopened.
 - **Allotments** (SARO/SAA, realignments ±, reversions −) are entered by program admins; obligations are checked against the allotment of their expense class.
 - **Package Financial Tracker** (package → *Finance* tab): many ORS (optionally per delivery), many deliveries (partial, with items, DR/IAR, accepted/rejected), many DVs each charged to one or more ORS (staged payments, tax withheld, net). It shows obligated %, accepted %, paid %, unobligated balance, *obligated-but-undelivered* and *delivered-but-unpaid* (payables). The activity *Finance* tab rolls packages up (drill-down by package/supplier) and records activity-level expenses (honoraria, direct payments).
@@ -205,6 +206,7 @@ R2 setup: a private bucket, a CORS rule allowing `GET, PUT, HEAD` from your app 
 - **Charts**: cumulative ORS/DV by month against the allotment; allotment/obligated/disbursed per expense class; packages by the phase of their current step; top suppliers (contract vs paid); spending per procurement category (ABC, contract, paid); unpaid ORS by age (0–30, 31–60, 61–90, 90+ days). Hover or focus any bar or point for the exact amounts.
 - **Lists**: overdue activities and packages (most days late first) with *Send Overdue Notice* for program admins; deliveries scheduled in the next 30 days and late ones.
 - **Needs attention**: your unanswered directives, approvals you can decide, overdue stages/tasks assigned to you, high/critical and overdue issues, payables unpaid 7+ days, flagged finance records, plans and savings awaiting an admin, suppliers with open packages and expiring papers.
+- **Customizable dashboard.** *Customize* lets each user choose cards, drag them into position and resize them. The layout is saved per account; a superadmin can set the default others start with.
 - **Compliance scorecard** per program: activities on schedule, ongoing activities with a progress update within the configured days, directives answered by their due date, obligation and disbursement rates, plans approved (of WFP/PPMP/APP), open high/critical issues.
 
 ## My Tasks, Calendar & Reports (Phase 10)
@@ -232,7 +234,7 @@ npx supabase login
 npx supabase link --project-ref <project-ref>        # from the project URL
 npx supabase db push --include-seed                  # migrations + DEV seed (omit --include-seed in production)
 npx supabase secrets set --env-file supabase/functions/.env
-npx supabase functions deploy admin-users files
+npx supabase functions deploy admin-users files sheets-fetch
 
 # Load a module seed into an existing project (seeds/*.sql are safe to re-run):
 npx supabase db query --linked -f supabase/seeds/02_beneficiaries.sql

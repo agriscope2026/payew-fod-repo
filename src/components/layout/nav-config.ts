@@ -11,6 +11,7 @@ import {
   ListChecksIcon,
   MegaphoneIcon,
   PieChartIcon,
+  PresentationIcon,
   ScrollTextIcon,
   SettingsIcon,
   SproutIcon,
@@ -79,16 +80,8 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    title: 'Programs',
+    title: 'Plans & Operations',
     items: [
-      {
-        label: 'Activities',
-        to: '/activities',
-        icon: ListChecksIcon,
-        phase: 5,
-        description: 'Activities, workflow stages, progress, issues and risks.',
-        keywords: 'workflow kanban stages',
-      },
       {
         label: 'Finance',
         to: '/finance',
@@ -97,6 +90,15 @@ export const NAV: NavSection[] = [
         description:
           'PPMP, WFP, APP sheets, allotments, obligations (ORS), disbursements (DV), savings.',
         keywords: 'ppmp wfp app ors dv budget obligation disbursement',
+      },
+      {
+        label: 'Activities (Physical)',
+        to: '/activities',
+        icon: ListChecksIcon,
+        phase: 5,
+        description:
+          'Physical targets and accomplishments by month, with each activity’s workflow.',
+        keywords: 'workflow kanban stages',
       },
       {
         label: 'Beneficiaries',
@@ -137,6 +139,15 @@ export const NAV: NavSection[] = [
         description:
           'BUR, physical & financial accomplishment, procurement, beneficiaries, compliance.',
         keywords: 'bur utilization accomplishment',
+      },
+      {
+        label: 'Presentations & Files',
+        to: '/library',
+        icon: PresentationIcon,
+        phase: 11,
+        description:
+          'Slides, spreadsheets, documents, pictures and links from Google Drive, viewed in PAYEW.',
+        keywords: 'pptx powerpoint slides excel word images google drive links library',
       },
       {
         label: 'Documents',

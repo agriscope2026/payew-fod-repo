@@ -12,7 +12,9 @@ const FY2026 = '20000000-0000-4000-8000-000000002026'
 /** Ongoing AMIA activity (first stage started) with an awarded package; staff 1 may edit. */
 async function setup(s: Session) {
   await s.asAdmin()
-  await s.q('update public.profiles set can_edit_activities = true where id = $1', [USERS.amiaStaff1])
+  await s.q('update public.profiles set can_edit_activities = true where id = $1', [
+    USERS.amiaStaff1,
+  ])
   const [{ id: supplier }] = await s.q<{ id: string }>(
     `insert into public.suppliers (business_name, tin) values ('Approval Test Supplies', '777-111-222') returning id`,
   )
@@ -38,15 +40,19 @@ async function setup(s: Session) {
   return { activity: act.id, code: act.code, pkg: pkg.id, supplier, other, stage: first.id }
 }
 
-const submit = (s: Session, type: string, entityType: string, id: string, payload: unknown = {}, fy: string | null = null) =>
+const submit = (
+  s: Session,
+  type: string,
+  entityType: string,
+  id: string,
+  payload: unknown = {},
+  fy: string | null = null,
+) =>
   s
-    .q<{ id: string }>(`select public.submit_approval($1, $2, $3, 'Because the field team asked', $4, $5) as id`, [
-      type,
-      entityType,
-      id,
-      JSON.stringify(payload),
-      fy,
-    ])
+    .q<{ id: string }>(
+      `select public.submit_approval($1, $2, $3, 'Because the field team asked', $4, $5) as id`,
+      [type, entityType, id, JSON.stringify(payload), fy],
+    )
     .then((r) => r[0].id)
 
 const decide = (s: Session, id: string, decision: string, note: string | null = null) =>
@@ -64,7 +70,9 @@ describe('extensions', () => {
       await s.q(`update public.activities set due_date = '2026-06-15' where id = $1`, [activity])
 
       const id = await submit(s, 'extension', 'activity', activity, { new_due_date: '2026-08-31' })
-      await expect(submit(s, 'extension', 'activity', activity, { new_due_date: '2026-09-30' })).rejects.toThrow(/already pending/)
+      await expect(
+        submit(s, 'extension', 'activity', activity, { new_due_date: '2026-09-30' }),
+      ).rejects.toThrow(/already pending/)
       await expect(decide(s, id, 'approved')).rejects.toThrow(/cannot decide/)
 
       await s.asAdmin()
@@ -72,10 +80,15 @@ describe('extensions', () => {
         `select user_id from public.notifications where entity_id = $1 and type = 'approval'`,
         [id],
       )
-      expect(deciders.map((d) => d.user_id)).toEqual(expect.arrayContaining([USERS.amiaAdmin, USERS.superadmin]))
+      expect(deciders.map((d) => d.user_id)).toEqual(
+        expect.arrayContaining([USERS.amiaAdmin, USERS.superadmin]),
+      )
 
       await s.as(USERS.amiaAdmin)
-      const [v] = await s.q<{ can_decide: boolean }>(`select can_decide from public.v_approval_requests where id = $1`, [id])
+      const [v] = await s.q<{ can_decide: boolean }>(
+        `select can_decide from public.v_approval_requests where id = $1`,
+        [id],
+      )
       expect(v.can_decide).toBe(true)
       await expect(decide(s, id, 'rejected')).rejects.toThrow(/reason for rejecting/)
       await decide(s, id, 'approved', 'OK, typhoon delays')
@@ -120,9 +133,15 @@ describe('Addendum B request types', () => {
       )
       await s.as(USERS.amiaStaff1)
       await expect(
-        submit(s, 'supplier_reaward', 'package', pkg, { supplier_id: black, contract_amount: 95000 }),
+        submit(s, 'supplier_reaward', 'package', pkg, {
+          supplier_id: black,
+          contract_amount: 95000,
+        }),
       ).rejects.toThrow(/Cannot award: Blacklisted/)
-      const re = await submit(s, 'supplier_reaward', 'package', pkg, { supplier_id: other, contract_amount: 95000 })
+      const re = await submit(s, 'supplier_reaward', 'package', pkg, {
+        supplier_id: other,
+        contract_amount: 95000,
+      })
       await s.as(USERS.amiaAdmin)
       await decide(s, re, 'approved')
       const var1 = await (async () => {
@@ -159,16 +178,28 @@ describe('Addendum B request types', () => {
       await s.q(`select public.award_package($1, $2, 50000, '2026-03-10')`, [pkg, sup])
       await s.as(USERS.amiaStaff1)
       const [{ r }] = await s.q<{ r: { id: string } }>(`select public.save_delivery($1) as r`, [
-        { package_id: pkg, status: 'delivered', delivery_date: '2026-03-20', amount: 50000, exception_remark: 'Rooms needed before ORS release' },
+        {
+          package_id: pkg,
+          status: 'delivered',
+          delivery_date: '2026-03-20',
+          amount: 50000,
+          exception_remark: 'Rooms needed before ORS release',
+        },
       ])
       const [req] = await s.q<{ id: string; request_type: string; justification: string }>(
         `select id, request_type, justification from public.approval_requests where entity_id = $1`,
         [r.id],
       )
-      expect(req).toMatchObject({ request_type: 'obligation_exception', justification: 'Rooms needed before ORS release' })
+      expect(req).toMatchObject({
+        request_type: 'obligation_exception',
+        justification: 'Rooms needed before ORS release',
+      })
       await s.as(USERS.amiaAdmin)
       await decide(s, req.id, 'approved')
-      const [d] = await s.q<{ flags: string[] }>(`select flags from public.package_deliveries where id = $1`, [r.id])
+      const [d] = await s.q<{ flags: string[] }>(
+        `select flags from public.package_deliveries where id = $1`,
+        [r.id],
+      )
       expect(d.flags).toContain('Delivered before obligation (exception approved)')
     })
   })
@@ -177,7 +208,9 @@ describe('Addendum B request types', () => {
     await inTx(db, async (s) => {
       const { activity, stage } = await setup(s)
       await s.as(USERS.amiaStaff1)
-      await expect(s.q(`select public.activity_stage_action($1, 'skip', 'x')`, [stage])).rejects.toThrow(/cannot be skipped/)
+      await expect(
+        s.q(`select public.activity_stage_action($1, 'skip', 'x')`, [stage]),
+      ).rejects.toThrow(/cannot be skipped/)
       const id = await submit(s, 'stage_skip', 'activity', activity, { stage_id: stage })
       await s.as(USERS.amiaAdmin)
       await decide(s, id, 'approved')
@@ -202,11 +235,36 @@ describe('Addendum B request types', () => {
         [activity],
       )
       await s.as(USERS.amiaStaff1)
-      const ec = await s.q<{ id: string; code: string }>(`select id, code from public.expense_classes where code in ('MOOE', 'CO') order by code`)
-      const realloc = await submit(s, 'realignment', 'program', PROGRAMS.AMIA,
-        { scope: 'allotment', from_expense_class_id: ec[1].id, to_expense_class_id: ec[0].id, amount: 10000, savings_entry_id: sv }, FY2026)
-      const budget = await submit(s, 'realignment', 'program', PROGRAMS.AMIA,
-        { scope: 'activity_budget', from_activity_id: activity, to_activity_id: other, amount: 50000 }, FY2026)
+      const ec = await s.q<{ id: string; code: string }>(
+        `select id, code from public.expense_classes where code in ('MOOE', 'CO') order by code`,
+      )
+      const realloc = await submit(
+        s,
+        'realignment',
+        'program',
+        PROGRAMS.AMIA,
+        {
+          scope: 'allotment',
+          from_expense_class_id: ec[1].id,
+          to_expense_class_id: ec[0].id,
+          amount: 10000,
+          savings_entry_id: sv,
+        },
+        FY2026,
+      )
+      const budget = await submit(
+        s,
+        'realignment',
+        'program',
+        PROGRAMS.AMIA,
+        {
+          scope: 'activity_budget',
+          from_activity_id: activity,
+          to_activity_id: other,
+          amount: 50000,
+        },
+        FY2026,
+      )
       await s.as(USERS.amiaAdmin)
       await decide(s, realloc, 'approved')
       await decide(s, budget, 'approved')
@@ -215,7 +273,10 @@ describe('Addendum B request types', () => {
         ['AR-' + realloc.slice(0, 8)],
       )
       expect(rows.map((r) => r.amount)).toEqual(['-10000.00', '10000.00'])
-      const [{ status }] = await s.q<{ status: string }>(`select status from public.savings_entries where id = $1`, [sv])
+      const [{ status }] = await s.q<{ status: string }>(
+        `select status from public.savings_entries where id = $1`,
+        [sv],
+      )
       expect(status).toBe('confirmed')
       const b = await s.q<{ budget_amount: string }>(
         `select budget_amount::text from public.activities where id in ($1, $2) order by budget_amount`,
@@ -231,10 +292,16 @@ describe('admin actions need the superadmin when configured', () => {
     await inTx(db, async (s) => {
       const { activity, pkg, other } = await setup(s)
       await s.asAdmin()
-      await s.q(`update public.app_settings set value = jsonb_set(value, '{admin_actions_need_superadmin}', 'true') where key = 'approvals'`)
+      await s.q(
+        `update public.app_settings set value = jsonb_set(value, '{admin_actions_need_superadmin}', 'true') where key = 'approvals'`,
+      )
       await s.as(USERS.amiaAdmin)
-      await expect(s.q(`select public.set_activity_cancelled($1, true, 'x')`, [activity])).rejects.toThrow(/superadmin approval/)
-      await expect(s.q(`select public.reaward_package($1, $2, 1000, 'x')`, [pkg, other])).rejects.toThrow(/superadmin approval/)
+      await expect(
+        s.q(`select public.set_activity_cancelled($1, true, 'x')`, [activity]),
+      ).rejects.toThrow(/superadmin approval/)
+      await expect(
+        s.q(`select public.reaward_package($1, $2, 1000, 'x')`, [pkg, other]),
+      ).rejects.toThrow(/superadmin approval/)
       // Ordinary work continues.
       await s.q(`update public.activities set remarks = 'still fine' where id = $1`, [activity])
       await s.as(USERS.superadmin)
@@ -251,7 +318,10 @@ describe('admin actions need the superadmin when configured', () => {
       await expect(s.q(`select public.withdraw_approval($1)`, [id])).rejects.toThrow(/own pending/)
       await s.as(USERS.amiaStaff1)
       await s.q(`select public.withdraw_approval($1)`, [id])
-      const [r] = await s.q<{ status: string }>(`select status from public.approval_requests where id = $1`, [id])
+      const [r] = await s.q<{ status: string }>(
+        `select status from public.approval_requests where id = $1`,
+        [id],
+      )
       expect(r.status).toBe('withdrawn')
     })
   })
@@ -267,19 +337,31 @@ describe('progress updates and issues', () => {
         [activity],
       )
       await expect(
-        s.q(`insert into public.progress_updates (activity_id, as_of_date, physical_pct, narrative) values ($1, '2099-01-01', 40, 'x y z')`, [activity]),
+        s.q(
+          `insert into public.progress_updates (activity_id, as_of_date, physical_pct, narrative) values ($1, '2099-01-01', 40, 'x y z')`,
+          [activity],
+        ),
       ).rejects.toThrow(/cannot be in the future/)
-      const [p] = await s.q<{ physical_pct: string; created_by: string; obligated_snapshot: string | null }>(
+      const [p] = await s.q<{
+        physical_pct: string
+        created_by: string
+        obligated_snapshot: string | null
+      }>(
         `select physical_pct::text, created_by, obligated_snapshot::text from public.v_activity_progress where activity_id = $1`,
         [activity],
       )
       expect(p).toMatchObject({ physical_pct: '35.00', created_by: USERS.amiaStaff1 })
       await s.as(USERS.amiaStaff2) // no edit rights
       await expect(
-        s.q(`insert into public.progress_updates (activity_id, as_of_date, physical_pct, narrative) values ($1, '2026-04-02', 40, 'x y z')`, [activity]),
+        s.q(
+          `insert into public.progress_updates (activity_id, as_of_date, physical_pct, narrative) values ($1, '2026-04-02', 40, 'x y z')`,
+          [activity],
+        ),
       ).rejects.toThrow(/row-level security/)
       await s.as(USERS.hvcAdmin)
-      expect(await s.q(`select 1 from public.progress_updates where activity_id = $1`, [activity])).toHaveLength(0)
+      expect(
+        await s.q(`select 1 from public.progress_updates where activity_id = $1`, [activity]),
+      ).toHaveLength(0)
     })
   })
 
@@ -304,10 +386,18 @@ describe('progress updates and issues', () => {
         ]),
       )
       await s.as(USERS.amiaStaff2)
-      await expect(s.q(`update public.issues set status = 'resolved' where id = $1`, [id])).rejects.toThrow(/issues_check/)
-      await s.q(`update public.issues set status = 'resolved', resolution = 'Detour via Atok' where id = $1`, [id])
       await expect(
-        s.q(`insert into public.issues (activity_id, title, owner_id) values ($1, 'Owner from HVC', $2)`, [activity, USERS.hvcStaff1]),
+        s.q(`update public.issues set status = 'resolved' where id = $1`, [id]),
+      ).rejects.toThrow(/issues_check/)
+      await s.q(
+        `update public.issues set status = 'resolved', resolution = 'Detour via Atok' where id = $1`,
+        [id],
+      )
+      await expect(
+        s.q(
+          `insert into public.issues (activity_id, title, owner_id) values ($1, 'Owner from HVC', $2)`,
+          [activity, USERS.hvcStaff1],
+        ),
       ).rejects.toThrow(/member of the program/)
     })
   })
@@ -317,10 +407,18 @@ describe('progress updates and issues', () => {
       const { activity } = await setup(s)
       await s.as(USERS.amiaStaff1)
       const req = await submit(s, 'cancellation', 'activity', activity)
-      await s.q(`insert into public.issues (activity_id, title, owner_id, due_date) values ($1, 'Late seeds', $2, '2026-03-01')`, [activity, USERS.amiaStaff1])
+      await s.q(
+        `insert into public.issues (activity_id, title, owner_id, due_date) values ($1, 'Late seeds', $2, '2026-03-01')`,
+        [activity, USERS.amiaStaff1],
+      )
       await s.asAdmin()
-      await s.q(`update public.approval_requests set requested_at = now() - interval '5 days' where id = $1`, [req])
-      const [{ r }] = await s.q<{ r: Record<string, number> }>(`select public.run_monitoring_reminders() as r`)
+      await s.q(
+        `update public.approval_requests set requested_at = now() - interval '5 days' where id = $1`,
+        [req],
+      )
+      const [{ r }] = await s.q<{ r: Record<string, number> }>(
+        `select public.run_monitoring_reminders() as r`,
+      )
       expect(r.approvals_waiting).toBeGreaterThan(0)
       expect(r.issues_overdue).toBeGreaterThan(0)
       expect(r.progress_due).toBeGreaterThan(0)

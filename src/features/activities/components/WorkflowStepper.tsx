@@ -414,7 +414,9 @@ function Requirements({
   if (!missing.length && !openTasks.length && !openSubs) return null
   return (
     <div className="border-warning/50 bg-warning/10 mt-3 rounded-md border p-2.5 text-xs">
-      <p className="mb-1 font-medium">Before completing this stage:</p>
+      <p className="mb-1 font-medium">
+        Still missing. You can complete the stage anyway and fill these in later:
+      </p>
       <ul className="list-inside list-disc space-y-0.5">
         {missing.length > 0 && (
           <li>
@@ -427,7 +429,9 @@ function Requirements({
             {t.doc_type_code && ' (upload it under Attachments with this document type)'}
           </li>
         ))}
-        {openSubs > 0 && <li>Finish or skip {openSubs} sub-step(s)</li>}
+        {openSubs > 0 && (
+          <li>Finish or skip {openSubs} sub-step(s) (needed before the stage can be completed)</li>
+        )}
       </ul>
     </div>
   )

@@ -82,7 +82,7 @@ npx supabase secrets set \
   R2_SECRET_ACCESS_KEY=<r2 secret> \
   R2_BUCKET=payew-files \
   ALLOWED_ORIGINS=https://payew.vercel.app
-npx supabase functions deploy admin-users files
+npx supabase functions deploy admin-users files sheets-fetch
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided to functions automatically. `ALLOWED_ORIGINS` is a comma-separated list; add your custom domain when you have one.
@@ -166,7 +166,7 @@ To switch the Supabase CLI between them, link before you push: `npx supabase lin
 - CI (`.github/workflows/ci.yml`) runs on every push to `dev` or `prod` and on every pull request: typecheck, lint, all tests (including the database tests on in-memory Postgres) and a production build.
 - Vercel deploys `prod` to production and `dev` to preview automatically.
 - **New migrations:** run `npx supabase db push` on the dev project when merged into `dev`, and on the production project when merged into `prod`. Never edit a migration that has already been applied; add a new one.
-- **Changed Edge Functions:** run `npx supabase functions deploy admin-users files`.
+- **Changed Edge Functions:** run `npx supabase functions deploy admin-users files sheets-fetch`.
 - **Maintenance:** Settings → System → Maintenance banner shows a notice to all users.
 
 ## 9. Backups and operations

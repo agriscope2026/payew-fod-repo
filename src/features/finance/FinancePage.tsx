@@ -3,128 +3,91 @@ import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { SelectNative } from '@/components/ui/select-native'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FinanceSheetView } from '@/features/sheets/components/FinanceSheetView'
+import type { SheetKind } from '@/features/sheets/model'
 import { useWorkspace } from '@/features/workspace/workspace-context'
-import { cn } from '@/lib/utils'
-import type { PlanType } from '@/types/database'
-import {
-  AllotmentsTab,
-  DisbursementsRegister,
-  FinanceOverview,
-  ObligationsRegister,
-  PayablesTab,
-  SavingsTab,
-} from './components/FinanceTabs'
-import { PlanSheet } from './components/PlanSheet'
+import { BudgetSettings } from './components/BudgetSettings'
 
-const TABS = ['overview', 'plans', 'allotments', 'ors', 'dv', 'payables', 'savings'] as const
-type Tab = (typeof TABS)[number]
+const SHEET_TABS: { tab: string; kind: SheetKind; label: string }[] = [
+  { tab: 'wfp', kind: 'WFP', label: 'WFP' },
+  { tab: 'ppmp', kind: 'PPMP', label: 'PPMP' },
+  { tab: 'app', kind: 'APP', label: 'APP' },
+  { tab: 'allotments', kind: 'allotments', label: 'Allotments' },
+  { tab: 'ors', kind: 'obligations', label: 'ORS register' },
+  { tab: 'dv', kind: 'disbursements', label: 'DV register' },
+]
+const TABS = [...SHEET_TABS.map((t) => t.tab), 'budget']
 
-/** /finance — follows the workspace FY and program selector. */
+/** /finance: the program's finance sheets for the workspace fiscal year. */
 export default function FinancePage() {
   const [params, setParams] = useSearchParams()
-  const tab = (TABS as readonly string[]).includes(params.get('tab') ?? '')
-    ? (params.get('tab') as Tab)
-    : 'overview'
-  const planParam = params.get('plan')
-  const planType: PlanType = planParam === 'PPMP' || planParam === 'APP' ? planParam : 'WFP'
-  const set = (next: Record<string, string>) => setParams(next, { replace: true })
+  const requested =
+    params.get('tab') === 'plans' ? (params.get('plan') ?? 'wfp').toLowerCase() : params.get('tab')
+  const tab = TABS.includes(requested ?? '') ? requested! : 'wfp'
 
   const { fiscalYear, selectedProgramIds, programs } = useWorkspace()
   const scope = { programIds: selectedProgramIds, fiscalYearId: fiscalYear?.id ?? null }
   const scopePrograms = programs.filter((p) => selectedProgramIds.includes(p.id))
-  const [planProgram, setPlanProgram] = useState('')
-  const planProgramId = scopePrograms.some((p) => p.id === planProgram)
-    ? planProgram
-    : (scopePrograms[0]?.id ?? '')
+  const [picked, setPicked] = useState('')
+  const program = scopePrograms.find((p) => p.id === picked) ?? scopePrograms[0]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Finance"
         description={`${fiscalYear?.label ?? 'No fiscal year'} · ${
-          scopePrograms.length === 1 ? scopePrograms[0].code : `${scopePrograms.length} programs`
-        } — plans, allotments, obligations (ORS), disbursements (DV), payables and savings.`}
+          program ? `${program.code} — ${program.name}` : 'No program'
+        }. Sheets work like Excel: type, paste, use formulas, and upload your own files.`}
+        actions={
+          scopePrograms.length > 1 && (
+            <SelectNative
+              aria-label="Program"
+              className="w-56"
+              value={program?.id ?? ''}
+              onChange={(e) => setPicked(e.target.value)}
+            >
+              {scopePrograms.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
+            </SelectNative>
+          )
+        }
       />
-      <Tabs value={tab} onValueChange={(t) => set(t === 'overview' ? {} : { tab: t })}>
+      <Tabs
+        value={tab}
+        onValueChange={(t) => setParams(t === 'wfp' ? {} : { tab: t }, { replace: true })}
+      >
         <div className="overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="plans">WFP / PPMP / APP</TabsTrigger>
-            <TabsTrigger value="allotments">Allotments</TabsTrigger>
-            <TabsTrigger value="ors">ORS register</TabsTrigger>
-            <TabsTrigger value="dv">DV register</TabsTrigger>
-            <TabsTrigger value="payables">Payables</TabsTrigger>
-            <TabsTrigger value="savings">Savings</TabsTrigger>
+            {SHEET_TABS.map((t) => (
+              <TabsTrigger key={t.tab} value={t.tab}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="budget">Budget settings</TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="mt-4">
-          <FinanceOverview scope={scope} />
-        </TabsContent>
-
-        <TabsContent value="plans" className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className="bg-card inline-flex rounded-md border p-0.5"
-              role="group"
-              aria-label="Plan"
-            >
-              {(['WFP', 'PPMP', 'APP'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={planType === t}
-                  onClick={() => set({ tab: 'plans', plan: t })}
-                  className={cn(
-                    'rounded px-3 py-1 text-sm',
-                    planType === t ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            {scopePrograms.length > 1 && (
-              <SelectNative
-                aria-label="Program"
-                className="w-48"
-                value={planProgramId}
-                onChange={(e) => setPlanProgram(e.target.value)}
-              >
-                {scopePrograms.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code} — {p.name}
-                  </option>
-                ))}
-              </SelectNative>
+        {SHEET_TABS.map((t) => (
+          <TabsContent key={t.tab} value={t.tab} className="mt-3">
+            {program && fiscalYear ? (
+              <FinanceSheetView
+                key={`${program.id}-${fiscalYear.id}-${t.kind}`}
+                program={program}
+                fiscalYear={fiscalYear}
+                kind={t.kind}
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Pick a fiscal year and program in the top bar.
+              </p>
             )}
-          </div>
-          {planProgramId && fiscalYear ? (
-            <PlanSheet
-              key={`${planProgramId}-${fiscalYear.id}-${planType}`}
-              programId={planProgramId}
-              fiscalYearId={fiscalYear.id}
-              type={planType}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">Pick a fiscal year and program.</p>
-          )}
-        </TabsContent>
-
-        <TabsContent value="allotments" className="mt-4">
-          <AllotmentsTab scope={scope} />
-        </TabsContent>
-        <TabsContent value="ors" className="mt-4">
-          <ObligationsRegister scope={scope} />
-        </TabsContent>
-        <TabsContent value="dv" className="mt-4">
-          <DisbursementsRegister scope={scope} />
-        </TabsContent>
-        <TabsContent value="payables" className="mt-4">
-          <PayablesTab scope={scope} />
-        </TabsContent>
-        <TabsContent value="savings" className="mt-4">
-          <SavingsTab scope={scope} />
+          </TabsContent>
+        ))}
+        <TabsContent value="budget" className="mt-3">
+          <BudgetSettings scope={scope} />
         </TabsContent>
       </Tabs>
     </div>

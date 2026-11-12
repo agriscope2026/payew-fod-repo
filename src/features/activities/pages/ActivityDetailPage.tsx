@@ -53,7 +53,6 @@ import { OverdueNoticeDialog } from '@/features/directives/components/OverdueNot
 import { useActivityIssues } from '@/features/monitoring/api'
 import { IssuesTab } from '@/features/monitoring/components/IssuesTab'
 import { ProgressTab } from '@/features/monitoring/components/ProgressTab'
-import { ActivityFinancePanel } from '@/features/finance/components/ActivityFinancePanel'
 import { PackagesTab } from '@/features/packages/components/PackagesTab'
 import { FIELD_LABEL } from '@/features/workflows/constants'
 import { useCommentCount } from '@/features/discussion/api'
@@ -83,7 +82,9 @@ import { DiscussionTab } from '../components/DiscussionTab'
 import { HistoryPanel, TransitionLog } from '../components/HistoryPanel'
 import { recordMissingFields } from '../stage-utils'
 import { TasksPanel } from '../components/TasksPanel'
+import { WfpStatusSelect } from '../components/WfpStatusSelect'
 import { WorkflowStepper } from '../components/WorkflowStepper'
+import { useActivityPhysicalOne } from '../physical'
 import { useActivityLookups } from '../use-activity-lookups'
 
 const TABS = [
@@ -111,6 +112,7 @@ export default function ActivityDetailPage() {
 
   const { data: activity, isPending, isError, refetch } = useActivity(id)
   const { data: stages = [] } = useActivityStages(id)
+  const { data: physical } = useActivityPhysicalOne(id)
   const { data: tasks = [] } = useTasks(id)
   const { data: transitions = [] } = useTransitions(id)
   const { data: links = [] } = useActivityBeneficiaries(id)
@@ -256,7 +258,6 @@ export default function ActivityDetailPage() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="progress">Progress</TabsTrigger>
             <TabsTrigger value="issues">
               Issues{' '}
@@ -298,7 +299,10 @@ export default function ActivityDetailPage() {
           />
         </TabsContent>
 
-        <TabsContent value="workflow" className="mt-4">
+        <TabsContent value="workflow" className="mt-4 space-y-4">
+          <div className="bg-card rounded-md border px-3 py-2.5">
+            <WfpStatusSelect physical={physical} canEdit={canEdit} />
+          </div>
           <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
             <WorkflowStepper
               stages={stages}
@@ -348,10 +352,6 @@ export default function ActivityDetailPage() {
             members={members}
             personName={lookups.name.person}
           />
-        </TabsContent>
-
-        <TabsContent value="finance" className="mt-4">
-          <ActivityFinancePanel activity={activity} canEdit={canEdit} canManage={canManage} />
         </TabsContent>
 
         <TabsContent value="packages" className="mt-4">

@@ -23,6 +23,7 @@ const ActivitiesModule = lazy(() => import('@/features/activities/ActivitiesModu
 const DirectivesModule = lazy(() => import('@/features/directives/DirectivesModule'))
 const SuppliersModule = lazy(() => import('@/features/suppliers/SuppliersModule'))
 const FinancePage = lazy(() => import('@/features/finance/FinancePage'))
+const LibraryPage = lazy(() => import('@/features/library/LibraryPage'))
 const ApprovalsModule = lazy(() => import('@/features/approvals/ApprovalsModule'))
 const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
 const CalendarPage = lazy(() => import('@/features/calendar/CalendarPage'))
@@ -44,6 +45,7 @@ const BUILT: Record<string, ReactNode> = {
   '/directives': <DirectivesModule />,
   '/suppliers': <SuppliersModule />,
   '/finance': <FinancePage />,
+  '/library': <LibraryPage />,
   '/approvals': <ApprovalsModule />,
   '/tasks': <TasksPage />,
   '/calendar': <CalendarPage />,

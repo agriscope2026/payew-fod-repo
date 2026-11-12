@@ -421,3 +421,7 @@ verify_jwt = true
 [functions.files]
 enabled = true
 verify_jwt = true
+
+[functions.sheets-fetch]
+enabled = true
+verify_jwt = true

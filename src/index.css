@@ -162,3 +162,49 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* Scrollbars that are easy to see, for wide sheets and tables. */
+.scroll-strong::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.scroll-strong::-webkit-scrollbar-track,
+.scroll-strong::-webkit-scrollbar-corner {
+  background: var(--muted);
+}
+.scroll-strong::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border: 3px solid var(--muted);
+  border-radius: 8px;
+}
+.scroll-strong::-webkit-scrollbar-thumb:hover {
+  border-width: 2px;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .scroll-strong {
+    scrollbar-width: auto;
+    scrollbar-color: var(--primary) var(--muted);
+  }
+}
+
+/* Printing a document view: only the document, on landscape A4. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  body:has(.print-doc) * {
+    visibility: hidden;
+  }
+  body:has(.print-doc) .print-doc,
+  body:has(.print-doc) .print-doc * {
+    visibility: visible;
+  }
+  body:has(.print-doc) .print-doc {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
