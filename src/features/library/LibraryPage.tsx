@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  DownloadIcon,
   ExternalLinkIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
@@ -11,6 +12,7 @@ import {
   Loader2Icon,
   PlusIcon,
   PresentationIcon,
+  QrCodeIcon,
   SearchIcon,
   Trash2Icon,
   VideoIcon,
@@ -44,6 +46,8 @@ import { errorMessage, supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import type { LinkedFileKind, LinkedFileRow } from '@/types/database'
 import { KIND_LABEL, parseLink } from './links'
+import { downloadQr } from './qr'
+import { QrCode } from './QrCode'
 
 const KIND_ICON: Record<LinkedFileKind, LucideIcon> = {
   presentation: PresentationIcon,
@@ -58,7 +62,7 @@ const KIND_ICON: Record<LinkedFileKind, LucideIcon> = {
 const KINDS = Object.keys(KIND_LABEL) as LinkedFileKind[]
 const key = ['linked_files'] as const
 
-/** Presentations, spreadsheets, documents, pictures and links, kept in Google Drive and shown here. */
+/** Files and Links: presentations, spreadsheets, documents, pictures and links, kept in Google Drive and shown here. */
 export default function LibraryPage() {
   const { profile, programs } = useAuth()
   const ws = useWorkspace()
@@ -68,6 +72,7 @@ export default function LibraryPage() {
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
   const [viewing, setViewing] = useState<LinkedFileRow | null>(null)
+  const [qrFor, setQrFor] = useState<LinkedFileRow | null>(null)
 
   const files = useQuery({
     queryKey: [...key, ws.selectedProgramIds],
@@ -107,7 +112,7 @@ export default function LibraryPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Presentations & Files"
+        title="Files and Links"
         description="Slides, spreadsheets, documents, pictures and links shared by the program, viewed without leaving PAYEW."
         actions={
           mine.length > 0 && (
@@ -210,6 +215,15 @@ export default function LibraryPage() {
                     </h3>
                     <p className="text-muted-foreground text-xs">{KIND_LABEL[f.kind]}</p>
                   </div>
+                  <button
+                    type="button"
+                    className="hover:border-primary focus-visible:ring-ring relative z-10 shrink-0 rounded border bg-white p-0.5 outline-none focus-visible:ring-2"
+                    aria-label={`Show the QR code for ${f.title}`}
+                    title="Scan to open on a phone. Click to enlarge."
+                    onClick={() => setQrFor(f)}
+                  >
+                    <QrCode value={f.url} className="size-16" />
+                  </button>
                 </div>
                 {f.description && (
                   <p className="text-muted-foreground mt-2 line-clamp-3 text-sm">{f.description}</p>
@@ -255,12 +269,48 @@ export default function LibraryPage() {
           onClose={() => setAdding(false)}
         />
       )}
-      {viewing && <Viewer file={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <Viewer file={viewing} onClose={() => setViewing(null)} onQr={() => setQrFor(viewing)} />
+      )}
+      {qrFor && <QrDialog file={qrFor} onClose={() => setQrFor(null)} />}
     </div>
   )
 }
 
-function Viewer({ file, onClose }: { file: LinkedFileRow; onClose: () => void }) {
+function QrDialog({ file, onClose }: { file: LinkedFileRow; onClose: () => void }) {
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="pr-8">{file.title}</DialogTitle>
+          <DialogDescription>
+            Scan with a phone camera to open this {KIND_LABEL[file.kind].toLowerCase()}.
+          </DialogDescription>
+        </DialogHeader>
+        <QrCode value={file.url} className="mx-auto w-full max-w-72 rounded-md border" />
+        <p className="text-muted-foreground text-center text-xs break-all">{file.url}</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={() => downloadQr(file.url, file.title)}>
+            <DownloadIcon /> Download PNG
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function Viewer({
+  file,
+  onClose,
+  onQr,
+}: {
+  file: LinkedFileRow
+  onClose: () => void
+  onQr: () => void
+}) {
   const parsed = parseLink(file.url)
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -277,6 +327,13 @@ function Viewer({ file, onClose }: { file: LinkedFileRow; onClose: () => void })
             >
               <ExternalLinkIcon className="size-3.5" /> Open in a new tab
             </a>
+            <button
+              type="button"
+              className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+              onClick={onQr}
+            >
+              <QrCodeIcon className="size-3.5" /> QR code
+            </button>
           </DialogDescription>
         </DialogHeader>
         <div className="bg-muted min-h-0 flex-1 overflow-hidden rounded-md border">

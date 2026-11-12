@@ -4,6 +4,7 @@ import {
   FileTextIcon,
   HistoryIcon,
   LayoutDashboardIcon,
+  LayoutGridIcon,
   ListOrderedIcon,
   Loader2Icon,
   SaveIcon,
@@ -59,6 +60,7 @@ import {
 import { headerRowCount, wfpActivities, wfpOutline } from '../wfp'
 import { downloadXlsx } from '../xlsx-io'
 import { AddCardDialog } from './AddCardDialog'
+import { CardView } from './CardView'
 import { DocumentView } from './DocumentView'
 import { SheetEditor } from './SheetEditor'
 import { UploadDialog } from './UploadDialog'
@@ -84,7 +86,7 @@ export function FinanceSheetView({
   const [uploadOpen, setUploadOpen] = useState(false)
   const [card, setCard] = useState<{ range: Range; evaluator: Evaluator } | null>(null)
   const [editorKey, setEditorKey] = useState(0)
-  const [view, setView] = useState<'sheet' | 'document'>('sheet')
+  const [view, setView] = useState<'sheet' | 'cards' | 'document'>('sheet')
   const [openActivity, setOpenActivity] = useState<ActivityView | null>(null)
   const sync = useSyncWfpActivities()
   // The Activities side of WFP rows: only loaded on the WFP tab.
@@ -353,6 +355,41 @@ export function FinanceSheetView({
   const saving =
     mutations.save.isPending || mutations.saveDraft.isPending || mutations.finalize.isPending
 
+  const rowExtras =
+    kind === 'WFP' && !isDraft
+      ? (row: number, ev: Evaluator) => {
+          const block = wfpActivities(sheet, name, ev).find((a) => row >= a.row && row <= a.lastRow)
+          if (!block) return null
+          const linkedId = [...(physical?.values() ?? [])].find(
+            (p) => p.wfp_row_id === block.rowId,
+          )?.activity_id
+          const view = activities.find((a) => a.id === linkedId)
+          return (
+            <>
+              <p className="font-medium">{block.title}</p>
+              <p className="text-muted-foreground text-xs">
+                Target {block.target ?? '—'} {block.unit ?? ''} · budget {formatPeso(block.budget)}{' '}
+                · obligated {formatPeso(block.obligated)} · disbursed {formatPeso(block.disbursed)}
+              </p>
+              {view ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setOpenActivity(view)}
+                >
+                  Open activity details
+                </Button>
+              ) : (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Save the WFP to add it to the Activities page.
+                </p>
+              )}
+            </>
+          )
+        }
+      : undefined
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -365,6 +402,7 @@ export function FinanceSheetView({
           {(
             [
               ['sheet', 'Sheet', Table2Icon],
+              ['cards', 'Cards', LayoutGridIcon],
               ['document', 'Document', FileTextIcon],
             ] as const
           ).map(([value, label, Icon]) => (
@@ -440,6 +478,19 @@ export function FinanceSheetView({
           heading={`${fiscalYear.label} ${SHEET_TITLE[kind]}`}
           subheading={`${program.code} — ${program.name} · as of ${formatDate(new Date().toISOString())}`}
         />
+      ) : view === 'cards' ? (
+        <CardView
+          sheet={sheet}
+          sheetName={name}
+          kind={kind}
+          evaluator={evaluatorFor(sheet)}
+          readOnly={!canWrite}
+          dirty={dirty}
+          saving={saving}
+          onChange={setWorking}
+          onSave={() => void save()}
+          rowExtras={rowExtras}
+        />
       ) : (
         <SheetEditor
           key={`${meta.id}-${editorKey}-${isDraft}`}
@@ -486,44 +537,7 @@ export function FinanceSheetView({
                   })
                 }
           }
-          rowExtras={
-            kind === 'WFP' && !isDraft
-              ? (row, ev) => {
-                  const block = wfpActivities(sheet, name, ev).find(
-                    (a) => row >= a.row && row <= a.lastRow,
-                  )
-                  if (!block) return null
-                  const linkedId = [...(physical?.values() ?? [])].find(
-                    (p) => p.wfp_row_id === block.rowId,
-                  )?.activity_id
-                  const view = activities.find((a) => a.id === linkedId)
-                  return (
-                    <>
-                      <p className="font-medium">{block.title}</p>
-                      <p className="text-muted-foreground text-xs">
-                        Target {block.target ?? '—'} {block.unit ?? ''} · budget{' '}
-                        {formatPeso(block.budget)} · obligated {formatPeso(block.obligated)} ·
-                        disbursed {formatPeso(block.disbursed)}
-                      </p>
-                      {view ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2"
-                          onClick={() => setOpenActivity(view)}
-                        >
-                          Open activity details
-                        </Button>
-                      ) : (
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          Save the WFP to add it to the Activities page.
-                        </p>
-                      )}
-                    </>
-                  )
-                }
-              : undefined
-          }
+          rowExtras={rowExtras}
           actions={
             <>
               {kind === 'WFP' && canWrite && (

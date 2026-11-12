@@ -38,6 +38,7 @@ import { errorMessage } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import type { ActivityPhysicalRow, ActivityView, DisplayStatus } from '@/types/database'
 import { useActivities } from '../api'
+import { ActivityCards } from '../components/ActivityCards'
 import { ActivityDialog } from '../components/ActivityDialog'
 import { ActivityStatusBadge } from '../components/ActivityStatusBadge'
 import { exportPhysicalSheet } from '../physical-export'
@@ -80,6 +81,7 @@ export default function ActivitiesListPage() {
   const [status, setStatus] = useState<DisplayStatus | ''>('')
   const [search, setSearch] = useState('')
   const [show, setShow] = useState<'targets' | 'done'>('targets')
+  const [layout, setLayout] = useState<'table' | 'cards'>('table')
   const [open, setOpen] = useState<ActivityView | null>(null)
   const [newOpen, setNewOpen] = useState(false)
   const [closedPhases, setClosedPhases] = useState<Set<string>>(() => new Set())
@@ -303,6 +305,27 @@ export default function ActivitiesListPage() {
             </button>
           ))}
         </div>
+        <div className="bg-card inline-flex rounded-md border p-0.5" role="group" aria-label="View">
+          {(
+            [
+              ['table', 'Table'],
+              ['cards', 'Cards'],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={layout === v}
+              onClick={() => setLayout(v)}
+              className={cn(
+                'rounded px-3 py-1 text-sm',
+                layout === v ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {canSeeTrash && (
           <label className="flex items-center gap-2 px-1 text-sm">
             <Checkbox checked={showTrash} onCheckedChange={(c) => setShowTrash(!!c)} /> Trash
@@ -323,6 +346,14 @@ export default function ActivitiesListPage() {
               ? undefined
               : 'Add activities in the WFP: a row with an activity and a unit of measure.'
           }
+        />
+      ) : layout === 'cards' ? (
+        <ActivityCards
+          rows={rows}
+          physical={physical}
+          show={show}
+          unitOf={unitOf}
+          onOpen={setOpen}
         />
       ) : (
         <div className="bg-card scroll-strong max-h-[calc(100vh-8rem)] overflow-auto rounded-md border">

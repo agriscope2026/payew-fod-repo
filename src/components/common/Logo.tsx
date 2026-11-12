@@ -1,18 +1,15 @@
 import { APP_NAME } from '@/lib/env'
 import { cn } from '@/lib/utils'
 
-/** Rice-terrace mark: stacked steps = workflow stages, flow = funds. */
+/** The DA Regional Field Office – CAR seal, on white so it reads on any background. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className={cn('size-8', className)}>
-      <rect width="32" height="32" rx="7" fill="#166534" />
-      <path
-        d="M5 24h22M7 19.5h18M9 15h14M11 10.5h10"
-        stroke="#facc15"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-    </svg>
+    <img
+      src="/brand/da-car-logo-192.png"
+      alt=""
+      aria-hidden="true"
+      className={cn('size-10 shrink-0 rounded-md bg-white object-contain p-0.5', className)}
+    />
   )
 }
 

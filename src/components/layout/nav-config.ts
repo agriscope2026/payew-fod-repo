@@ -11,7 +11,6 @@ import {
   ListChecksIcon,
   MegaphoneIcon,
   PieChartIcon,
-  PresentationIcon,
   ScrollTextIcon,
   SettingsIcon,
   SproutIcon,
@@ -141,21 +140,14 @@ export const NAV: NavSection[] = [
         keywords: 'bur utilization accomplishment',
       },
       {
-        label: 'Presentations & Files',
+        label: 'Files and Links',
         to: '/library',
-        icon: PresentationIcon,
+        icon: FolderOpenIcon,
         phase: 11,
         description:
           'Slides, spreadsheets, documents, pictures and links from Google Drive, viewed in PAYEW.',
-        keywords: 'pptx powerpoint slides excel word images google drive links library',
-      },
-      {
-        label: 'Documents',
-        to: '/repository',
-        icon: FolderOpenIcon,
-        phase: 3,
-        description: 'Central file library: PPMP, WFP, APP, ORS, DV, contracts, reports, photos.',
-        keywords: 'files repository attachments',
+        keywords:
+          'pptx powerpoint slides excel word images google drive links library documents qr',
       },
       {
         label: 'Announcements',

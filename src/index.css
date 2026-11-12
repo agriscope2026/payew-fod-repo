@@ -163,27 +163,67 @@
   }
 }
 
-/* Scrollbars that are easy to see, for wide sheets and tables. */
+/* Scrollbars that are easy to see, for wide sheets and tables: DA orange, with arrows. */
+.scroll-strong {
+  --scroll-thumb: #f07d00;
+  --scroll-thumb-hover: #c96300;
+  --scroll-track: color-mix(in srgb, var(--scroll-thumb) 16%, var(--card));
+}
 .scroll-strong::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 .scroll-strong::-webkit-scrollbar-track,
 .scroll-strong::-webkit-scrollbar-corner {
-  background: var(--muted);
+  background: var(--scroll-track);
 }
 .scroll-strong::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border: 3px solid var(--muted);
-  border-radius: 8px;
+  background: var(--scroll-thumb);
+  border: 3px solid var(--scroll-track);
+  border-radius: 9px;
 }
-.scroll-strong::-webkit-scrollbar-thumb:hover {
+.scroll-strong::-webkit-scrollbar-thumb:hover,
+.scroll-strong::-webkit-scrollbar-thumb:active {
+  background: var(--scroll-thumb-hover);
   border-width: 2px;
+}
+/* One arrow button at each end. */
+.scroll-strong::-webkit-scrollbar-button {
+  display: none;
+}
+.scroll-strong::-webkit-scrollbar-button:single-button {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background-color: var(--scroll-thumb);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+}
+.scroll-strong::-webkit-scrollbar-button:single-button:hover,
+.scroll-strong::-webkit-scrollbar-button:single-button:active {
+  background-color: var(--scroll-thumb-hover);
+}
+.scroll-strong::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11 2 4 8l7 6z' fill='white'/%3E%3C/svg%3E");
+  border-radius: 4px 0 0 4px;
+}
+.scroll-strong::-webkit-scrollbar-button:single-button:horizontal:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 2l7 6-7 6z' fill='white'/%3E%3C/svg%3E");
+  border-radius: 0 4px 4px 0;
+}
+.scroll-strong::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 11 8 4l6 7z' fill='white'/%3E%3C/svg%3E");
+  border-radius: 4px 4px 0 0;
+}
+.scroll-strong::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 5l6 7 6-7z' fill='white'/%3E%3C/svg%3E");
+  border-radius: 0 0 4px 4px;
 }
 @supports not selector(::-webkit-scrollbar) {
   .scroll-strong {
     scrollbar-width: auto;
-    scrollbar-color: var(--primary) var(--muted);
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   }
 }
 

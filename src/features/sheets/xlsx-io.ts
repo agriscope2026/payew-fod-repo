@@ -485,7 +485,7 @@ export async function buildXlsx(input: ExportInput): Promise<ArrayBuffer> {
 let logoCache: Promise<ArrayBuffer | null> | null = null
 /** The DA seal served with the app; null if it can't be loaded. */
 export function loadLogo() {
-  logoCache ??= fetch('/brand/da-logo.png')
+  logoCache ??= fetch('/brand/da-car-logo.png')
     .then((r) => (r.ok ? r.arrayBuffer() : null))
     .catch(() => null)
   return logoCache

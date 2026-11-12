@@ -49,8 +49,8 @@ export function DocumentView({
       <article className="print-doc bg-card mx-auto max-w-[1200px] rounded-md border px-6 py-8 shadow-sm sm:px-10 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <header className="border-primary mb-6 flex items-center gap-4 border-b-4 pb-4">
           <img
-            src="/brand/da-logo.png"
-            alt="Department of Agriculture seal"
+            src="/brand/da-car-logo.png"
+            alt="DA Regional Field Office CAR logo"
             className="size-20 shrink-0"
           />
           <div className="min-w-0 flex-1 text-center">

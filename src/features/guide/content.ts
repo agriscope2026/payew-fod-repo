@@ -18,7 +18,7 @@ export const TUTORIALS: Tutorial[] = [
     summary: 'Sign in, pick your fiscal year and program, and find your way around.',
     steps: [
       'Sign in with the email and temporary password from your administrator. You will be asked to set your own password the first time.',
-      'Use the Fiscal year and Program selectors in the top bar. Almost every page — Dashboard, Activities, Finance, Calendar, Reports — follows them.',
+      'Use the Fiscal year and Program selectors in the top bar. Almost every page — Dashboard, Finance, Activities (Physical), Calendar, Reports — follows them.',
       'Program staff and admins see their own programs; the superadmin can also choose "All programs".',
       'Press Ctrl+K (or click the search box) to jump to any activity, package, supplier, beneficiary or page.',
       'Open Profile from the menu at the top right to update your name, position, contact number and photo.',
@@ -31,33 +31,68 @@ export const TUTORIALS: Tutorial[] = [
   },
   {
     id: 'planning',
-    title: 'Planning: WFP, PPMP and APP',
-    summary: 'Build the year’s plans in an Excel-like sheet and submit them for approval.',
+    title: 'The WFP: the main sheet you type in',
+    summary:
+      'Finance sheets work like Excel. The WFP is where you encode; the other pages fill themselves from it.',
     steps: [
-      'Go to Finance → WFP / PPMP / APP and choose the plan type.',
-      'Type in the grid like Excel: arrow keys move, typing edits, Ctrl+C / Ctrl+V copy to and from Excel, Shift+click selects a range. Or use Import to load an .xlsx.',
-      'Amount is quantity × unit cost. Rows whose monthly schedule does not add up to the amount are flagged.',
-      'On PPMP/APP rows you can tag the procurement package a line belongs to.',
-      'Click Submit. A program admin reviews and approves it; approved plans are read-only until reopened.',
+      'Go to Finance → WFP. The sheet starts from the DA-CAR template: Phase/Component, Activity, Sub-activity, Unit of Measure, Annual Target, Object of Expenditure, Annual Budget, obligation and disbursement columns, Status and Remarks.',
+      'Click a cell and type, as in Excel. Double-click a cell to place the cursor inside it; long text opens in a box that grows so you can read all of it. Formulas start with “=”.',
+      'Use the open button at the start of a row to see the whole row as a form and edit every column at once.',
+      'Pick the Status from its dropdown. To change the choices, select the column and use Dropdown in the toolbar.',
+      'Click Save. Numbering and lettering of phases, activities and sub-activities are put in order for you, and the linked pages are updated: Activities (Physical), the ORS and DV registers, the PPMP and the APP.',
+      'The Σ row pinned at the bottom shows the column totals while you scroll. Use the arrows beside a phase to collapse or expand its activities, or Outline in the toolbar to do it for the whole sheet.',
     ],
-    link: { to: '/finance?tab=plans', label: 'Open the plans' },
+    tips: [
+      'A row counts as an activity when it has an activity title and a unit of measure.',
+      '“Linked sheets” in the toolbar shows which pages the WFP feeds and lets you update them again.',
+      'The orange scrollbar and its arrows show there is more to the right or below.',
+      'History keeps the last 30 saved versions, and can start over from the template.',
+    ],
+    link: { to: '/finance', label: 'Open Finance' },
+  },
+  {
+    id: 'sheet-views',
+    title: 'Sheet, Cards and Document views',
+    summary: 'Three ways to look at the same finance sheet.',
+    steps: [
+      'Use the Sheet | Cards | Document switch beside the sheet’s name.',
+      'Sheet is the Excel-like grid with the formatting toolbar: number formats, bold and colours, alignment, merge, borders, rows and columns, freeze, and clean-up tools.',
+      'Cards shows one card per activity in the WFP (budget, obligated, disbursed, balance) and one card per row in the other sheets. Click a card to edit the whole row, then Save.',
+      'Document is a read-only page with the DA-CAR letterhead for reading and printing. Use “Print or save as PDF”.',
+    ],
+    link: { to: '/finance', label: 'Open Finance' },
+  },
+  {
+    id: 'upload-export',
+    title: 'Uploading and exporting sheets',
+    summary:
+      'Bring in an Excel file or Google Sheet that follows the template, and export a presentable workbook.',
+    steps: [
+      'In a finance sheet click Upload, then choose an .xlsx file or paste a Google Sheets link. Download the template from the same dialog if you need a copy.',
+      'The upload is accepted only when its columns match the template. The dialog tells you what does not match.',
+      'An accepted upload opens as a draft. Clean it up — remove empty rows, fix formats — then click Finalize to replace the current sheet, or Discard draft.',
+      'Export downloads an .xlsx with the DA-CAR logo, title, colours and totals, ready to present.',
+    ],
+    link: { to: '/finance', label: 'Open Finance' },
   },
   {
     id: 'activities',
-    title: 'Activities and their workflow',
-    summary: 'Create an activity, move it through its stages and keep its checklist complete.',
+    title: 'Activities (Physical) and their workflow',
+    summary:
+      'Monthly and quarterly physical targets and accomplishments, with each activity’s workflow and status.',
     steps: [
-      'Activities → New activity. Fill in the title, dates, budget, location and responsible person.',
-      'The activity gets its program’s workflow (Design → Approval → PPMP/WFP/APP → Procurement & Implementation → Liquidation → Savings → Closed).',
-      'On the Workflow tab, Start and Complete each stage. A stage cannot be completed until its required fields and documents are in.',
-      'Uploading a required document (e.g. the PR) ticks its checklist item automatically.',
-      'Link the beneficiaries served on the Beneficiaries tab.',
+      'Activities come from the WFP. “New activity” takes you to the WFP: add a row with the activity and its unit of measure, then save.',
+      'The chart at the top compares cumulative targets with accomplishments by month. Below it, activities are grouped by phase with their monthly and quarterly figures.',
+      'Switch between Targets and Accomplished, and between Table and Cards.',
+      'Click an activity to open it: enter monthly targets and accomplishments, and see its budget, obligated and disbursed amounts from the WFP.',
+      'On the activity’s Workflow tab, Start and Complete each stage. Missing details or documents only show a warning — you can still complete the stage.',
+      'Set the Status on the Workflow tab. It is the same Status as in the WFP, so changing it in either place changes both, and the dashboard graphs it.',
     ],
     tips: [
-      'Stages show their planned dates; overdue ones turn red and trigger reminders and, later, escalation.',
+      'An activity removed from the WFP stays here marked “Not in WFP”, so its records are not lost.',
       'Staff need “can edit activities” on their account to change activities.',
     ],
-    link: { to: '/activities', label: 'Open Activities' },
+    link: { to: '/activities', label: 'Open Activities (Physical)' },
   },
   {
     id: 'packages',
@@ -82,14 +117,18 @@ export const TUTORIALS: Tutorial[] = [
   },
   {
     id: 'finance',
-    title: 'Allotments, obligations and payments',
-    summary: 'Record SARO/SAA allotments, ORS, deliveries and DVs, and read the warnings.',
+    title: 'PPMP, APP, allotments, ORS and DV sheets',
+    summary:
+      'The other finance sheets receive rows from the WFP; you complete the remaining columns there.',
     steps: [
-      'Program admins enter allotments (SARO, sub-allotments, realignments, reversions) under Finance → Allotments.',
-      'On a package’s Finance tab: add ORS (several are allowed), deliveries with their items, and DVs. Each DV is charged to one or more ORS and can be a partial payment.',
-      'Non-package costs (honoraria, direct payments) go on the activity’s Finance tab.',
-      'The system checks ORS ≤ contract (or ABC), ORS ≤ activity budget, ORS ≤ allotment, deliveries ≤ contract and DV ≤ unpaid ORS. Depending on Settings it blocks the save or saves it with a warning flag.',
-      'Finance → Payables lists accepted deliveries not yet paid, with days outstanding.',
+      'Finance has a tab for each sheet: WFP, PPMP, APP, Allotments, ORS register and DV register.',
+      'When the WFP is saved, its rows appear where they belong: rows with a supplier or PO in the ORS register, amounts for disbursement in the DV register, budget lines in the PPMP and activities in the APP.',
+      'The note above each sheet names the columns that follow the WFP. Change those in the WFP; fill in the rest (ORS No., dates, mode of procurement…) on the sheet itself.',
+      'Allotments is typed directly: SARO, sub-allotments and other releases.',
+      'Formulas can read another sheet by its name, for example =SUM(WFP!G4:G50).',
+    ],
+    tips: [
+      'A sheet whose columns were changed from the template is marked Custom and is no longer filled from the WFP automatically.',
     ],
     link: { to: '/finance', label: 'Open Finance' },
   },
@@ -130,26 +169,43 @@ export const TUTORIALS: Tutorial[] = [
   },
   {
     id: 'reports',
-    title: 'Reports and the Dashboard',
-    summary: 'Monitor utilization and export reports to Excel.',
+    title: 'The Dashboard and Reports',
+    summary: 'See the budget, obligations, disbursements and physical progress at a glance.',
     steps: [
-      'The Dashboard shows the allotment, obligation and disbursement rates, overdue items, pending deliveries, spending by supplier and category, obligation aging and each program’s compliance.',
-      'Reports lists the Budget Utilization Report (with activity → package → supplier drill-down), Accomplishment, Procurement Status, Supplier Performance, Supplier Awards & Payments, Savings, Payables, Beneficiaries and Compliance.',
-      'Filter or sort any report, then Export .xlsx or Print.',
+      'The Dashboard opens with the WFP budget, Obligated, Disbursed and Unobligated balance, then budget by phase, activities by status, physical targets against accomplishments, targets by quarter and the largest activities.',
+      'Click Customize to move, resize, hide or add cards. Reset returns to the default layout.',
+      'To show your own figure, select cells in a finance sheet, right-click and choose “Show on dashboard”, or use the card button on the Σ totals row. Name the card and it appears under Customize → Cards.',
+      'Reports lists the utilization, accomplishment, procurement, beneficiary and compliance reports. Filter or sort, then Export .xlsx or Print.',
     ],
-    link: { to: '/reports', label: 'Open Reports' },
+    link: { to: '/dashboard', label: 'Open the Dashboard' },
+  },
+  {
+    id: 'files-links',
+    title: 'Files and Links',
+    summary:
+      'Keep presentations, spreadsheets, documents, pictures and links in one place, each with a QR code.',
+    steps: [
+      'Open Files and Links and click “Link a file”.',
+      'In Google Drive choose Share → “Anyone with the link” → Viewer, copy the link and paste it. Give it a name; the kind is detected for you.',
+      'Click a card to view the file inside PAYEW. Google Slides, Sheets, Docs, Drive files and folders, pictures and YouTube open in place; other links open in a new tab.',
+      'Every card has a QR code. Scan it with a phone to open the file, or click it to enlarge and Download PNG for slides and printed handouts.',
+    ],
+    tips: [
+      'Files are linked for now, not uploaded. Uploading straight to PAYEW will be turned on once file storage is available.',
+      'Removing a link does not delete the file in Drive.',
+    ],
+    link: { to: '/library', label: 'Open Files and Links' },
   },
   {
     id: 'records',
-    title: 'Beneficiaries, suppliers and documents',
+    title: 'Beneficiaries and suppliers',
     summary: 'Keep the shared master lists clean.',
     steps: [
       'Beneficiaries and Suppliers are shared by all programs. Before adding one, the system checks for similar names (and TINs for suppliers) to avoid duplicates. Both can be imported from and exported to Excel.',
       'Supplier profiles show packages, totals awarded and paid, on-time delivery and ratings. Bank details and ratings are visible to admins only.',
-      'Documents holds every uploaded file. Package documents are filed under program → activity → package automatically. Uploading a new version keeps the old ones.',
       'Deleted records go to Trash, where admins can restore them.',
     ],
-    link: { to: '/repository', label: 'Open Documents' },
+    link: { to: '/beneficiaries', label: 'Open Beneficiaries' },
   },
 ]
 
@@ -162,6 +218,22 @@ export const FAQS: Faq[] = [
   {
     q: 'I can’t edit an activity. Why?',
     a: 'Program staff need “can edit activities” turned on by an admin. Locked fiscal years and archived programs are read-only for everyone.',
+  },
+  {
+    q: 'Why was my upload not accepted?',
+    a: 'Uploads must have the same columns as the sheet’s template. Download the template from the Upload dialog, paste your data into it and upload again.',
+  },
+  {
+    q: 'I added an activity in the WFP but it is not in Activities (Physical).',
+    a: 'Save the WFP first. The row also needs an activity title and a unit of measure. You can run it again from “Linked sheets” → “Update linked sheets now”.',
+  },
+  {
+    q: 'Can I complete a workflow stage without all the details?',
+    a: 'Yes. Missing fields and documents are shown as a warning only.',
+  },
+  {
+    q: 'Where did the Documents page go?',
+    a: 'It was replaced by Files and Links, where files are linked from Google Drive and each has a QR code.',
   },
   {
     q: 'Why was my ORS saved with a warning?',
