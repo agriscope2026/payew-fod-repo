@@ -52,7 +52,7 @@ describe('my_work_items', () => {
         [act.id, USERS.amiaStaff1],
       )
       await s.q(
-        `select public.issue_directive($1, 'Submit the Q3 report', 'Please send it by Friday.', $2, '2026-10-09')`,
+        `select public.issue_directive($1, 'Submit the Q3 report', 'Please send it by Friday.', $2, '2099-12-31')`,
         [PROGRAMS.AMIA, [USERS.amiaStaff1]],
       )
 
@@ -63,7 +63,7 @@ describe('my_work_items', () => {
       expect(mine.find((i) => i.kind === 'task' && i.item_id === task.id)).toBeTruthy()
       expect(
         mine.find((i) => i.kind === 'directive' && i.title === 'Submit the Q3 report')?.due_date,
-      ).toBe('2026-10-09')
+      ).toBe('2099-12-31')
       // The first stage is assigned to staff 2, so it is not staff 1's.
       expect(mine.find((i) => i.kind === 'stage' && i.item_id === stage.id)).toBeUndefined()
 
